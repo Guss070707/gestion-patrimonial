@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gestión Patrimonial — G&A</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg:#0f1117; --bg-secondary:#1a1d27; --bg-card:#1e2130; --border:#2e3349;
+    --text:#e8eaf0; --text-secondary:#8b92a9; --text-success:#34d399; --text-danger:#f87171;
+    --bg-success:#064e3b; --bg-danger:#450a0a; --bg-neutral:#1f2937; --text-neutral:#d1d5db;
+    --accent:#4f9eed; --radius:8px; --radius-sm:4px; --shadow:0 2px 8px rgba(0,0,0,0.4);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg-secondary);color:var(--text);min-height:100vh;} ::selection{background:#4f9eed33;}
+  #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-secondary);}
+  .login-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:340px;box-shadow:0 4px 24px rgba(0,0,0,0.1);text-align:center;}
+  .login-box h2{font-size:20px;margin-bottom:6px;}
+  .login-box p{font-size:13px;color:var(--text-secondary);margin-bottom:24px;}
+  .login-box input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;margin-bottom:12px;text-align:center;letter-spacing:2px;}
+  .login-box button{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;}
+  .login-box .error{color:var(--text-danger);font-size:13px;margin-top:8px;display:none;}
+  #main-app{display:none;}
+  #header{background:var(--bg-card);border-bottom:1px solid var(--border);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;}
+  #header h1{font-size:17px;font-weight:600;}
+  #header-right{display:flex;align-items:center;gap:16px;}
+  #header-right span{font-size:13px;color:var(--text-secondary);}
+  #sync-status{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--bg-success);color:var(--text-success);}
+  #sync-status.syncing{background:#fef3c7;color:#92400e;}
+  #sync-status.error{background:var(--bg-danger);color:var(--text-danger);}
+  #tabs{background:var(--bg-card);border-bottom:1px solid var(--border);padding:0 32px;display:flex;gap:4px;overflow-x:auto;}
+  .tab-btn{border:none;background:none;padding:14px 18px;font-size:14px;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;}
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+  #content{max-width:1100px;margin:0 auto;padding:28px 32px;}
+  .view{display:none;} .view.active{display:block;}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow);}
+  .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px;}
+  .metric-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+  .metric-card .label{font-size:13px;color:var(--text-secondary);margin-bottom:6px;}
+  .metric-card .value{font-size:28px;font-weight:600;}
+  .chart-wrap{position:relative;width:100%;margin-bottom:28px;}
+  .chart-title{font-size:14px;font-weight:500;color:var(--text-secondary);margin-bottom:10px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;padding:8px 6px;font-weight:500;color:var(--text-secondary);border-bottom:1px solid var(--border);}
+  td{padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 10px;border-radius:99px;}
+  .badge-success{background:var(--bg-success);color:var(--text-success);}
+  .badge-danger{background:var(--bg-danger);color:var(--text-danger);}
+  .badge-neutral{background:var(--bg-neutral);color:var(--text-neutral);}
+  button{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text);padding:6px 14px;font-size:13px;cursor:pointer;transition:opacity .15s;}
+  button:hover{opacity:.8;}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500;padding:10px 24px;font-size:14px;}
+  button.danger{color:var(--text-danger);border-color:#fca5a5;background:var(--bg-danger);}
+  button.success-btn{color:var(--text-success);border-color:#6ee7b7;background:var(--bg-success);}
+  input[type="text"],input[type="number"],input[type="date"]{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;width:100%;background:var(--bg);color:var(--text);outline:none;}
+  input:focus{border-color:var(--accent);}
+  label{font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;}
+  .form-group{display:flex;flex-direction:column;gap:4px;}
+  .section-title{font-size:16px;font-weight:600;margin-bottom:16px;}
+  .loan-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+  .loan-name{font-size:16px;font-weight:600;}
+  .loan-meta{font-size:13px;color:var(--text-secondary);margin-bottom:10px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;}
+  .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px;}
+  .abono-row{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px;border-top:1px solid var(--border);}
+  .abono-row:first-child{border-top:none;}
+  .abonos-section{margin:8px 0 12px;padding:10px 12px;background:var(--bg-secondary);border-radius:var(--radius-sm);}
+  .abonos-section .sub-title{font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;}
+  .scrollable{max-height:260px;overflow-y:auto;}
+  .comision-row{display:flex;align-items:center;gap:6px;}
+  .comision-row input{width:60px;}
+  #status-banner{display:none;background:var(--bg-danger);color:var(--text-danger);padding:10px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:13px;}
+  #modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;}
+  #modal-overlay.open{display:flex;}
+  #modal-box{background:var(--bg-card);border-radius:var(--radius);padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.15);}
+  #modal-box .modal-title{font-size:15px;font-weight:600;margin-bottom:16px;}
+  #modal-box .modal-body{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
+  #modal-box .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--text-secondary);margin-top:6px;margin-bottom:20px;}
+  .legend-item{display:flex;align-items:center;gap:5px;}
+  .legend-dot{width:10px;height:10px;border-radius:2px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  @media(max-width:700px){#content{padding:16px;}#header{padding:12px 16px;}#tabs{padding:0 16px;}.two-col{grid-template-columns:1fr;}.form-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-box">
+    <h2>💼 Gestión Patrimonial G&A</h2>
+    <p>Ingresa la contraseña para acceder</p>
+    <input type="password" id="login-input" placeholder="Contraseña" />
+    <button onclick="checkLogin()">Ingresar</button>
+    <div class="error" id="login-error">Contraseña incorrecta</div>
+  </div>
+</div>
+
+<!-- App principal -->
+<div id="main-app">
+  <div id="header">
+    <h1>📊 Gestión Patrimonial — G&A</h1>
+    <div id="header-right">
+      <span id="today-date"></span>
+      <button onclick="descargarBackup()" style="font-size:11px;padding:3px 10px;opacity:0.6;" title="Descargar backup">💾 Backup</button>
+      <span id="sync-status">● Sincronizado</span>
+    </div>
+  </div>
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Préstamos</button>
+    <button class="tab-btn" data-tab="prestamos">Plazo abierto</button>
+    <button class="tab-btn" data-tab="cuotas">En cuotas</button>
+    <button class="tab-btn" data-tab="historial">Historial</button>
+    <button class="tab-btn" data-tab="analisis">Análisis</button>
+    <button class="tab-btn" data-tab="patrimonio">Patrimonio</button>
+    <button class="tab-btn" data-tab="caja">Caja interna</button>
+    <button class="tab-btn" data-tab="nuevo">Nuevo a plazo</button>
+    <button class="tab-btn" data-tab="nuevocuota">Nuevo en cuotas</button>
+  </div>
+  <div id="content">
+    <div id="status-banner"></div>
+    <div id="view-dashboard" class="view active"></div>
+    <div id="view-resumen" class="view"></div>
+    <div id="view-prestamos" class="view"></div>
+    <div id="view-cuotas" class="view"></div>
+    <div id="view-historial" class="view"></div>
+    <div id="view-analisis" class="view"></div>
+    <div id="view-caja" class="view"></div>
+    <div id="view-patrimonio" class="view"></div>
+    <div id="view-nuevo" class="view"></div>
+    <div id="view-nuevocuota" class="view"></div>
+  </div>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal-box"></div>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURACIÓN SUPABASE
+// ============================================================
+var SUPABASE_URL = 'https://mwctglaiehoksisptnbr.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13Y3RnbGFpZWhva3Npc3B0bmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDcyNTMsImV4cCI6MjA5NzM4MzI1M30.xr7y1RqCzVQ5GL9oObvJDkjiHfZhWUJfpI5DTTZtLMA';
+var APP_PASSWORD = 'GA2000';
+var SEED_KEY = 'prestamos:seeded_v4';
+var HISTORIAL_SEED_DONE = false;
+
+// ============================================================
+// LOGIN
+// ============================================================
+function checkLogin(){
+  var val = document.getElementById('login-input').value;
+  if(val === APP_PASSWORD){
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    sessionStorage.setItem('auth','1');
+    init();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+document.getElementById('login-input').addEventListener('keydown', function(e){ if(e.key==='Enter') checkLogin(); });
+if(sessionStorage.getItem('auth')==='1'){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-app').style.display='block';
+}
+
+// ============================================================
+// SUPABASE API
+// ============================================================
+async function sbFetch(path, method, body){
+  var opts = {
+    method: method||'GET',
+    headers: {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=representation'}
+  };
+  if(body) opts.body = JSON.stringify(body);
+  var res = await fetch(SUPABASE_URL+'/rest/v1/'+path, opts);
+  if(!res.ok){ var t=await res.text(); throw new Error(t); }
+  var ct = res.headers.get('content-type')||'';
+  return ct.includes('json') ? res.json() : [];
+}
+async function sbGet(table){ 
+  var sep = table.includes('?') ? '&' : '?';
+  return sbFetch(table+sep+'select=*','GET'); 
+}
+async function sbUpsert(table, row){ return sbFetch(table,'POST',[row]); }  // with Prefer:resolution=merge-duplicates handled via headers below
+async function sbUpsertReal(table, row){
+  var opts = {
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'resolution=merge-duplicates,return=representation'}
+  };
+  opts.body = JSON.stringify([row]);
+  var res = await fetch(SUPABASE_URL+'/rest/v1/'+table, opts);
+  if(!res.ok){ var t=await res.text(); throw new Error(t); }
+  return [];
+}
+async function sbDelete(table, id){ return sbFetch(table+'?id=eq.'+id,'DELETE'); }
+
+// ============================================================
+// ESTADO
+// ============================================================
+var loans = [];
+var historialPrestamos = [];
+var patrimonioBolsas = [];
+var cajaInterna = {andrea:{junta:[],intereses:[]},gustavo:{junta:[],intereses:[]}};
+var cuotaLoans = [];
+var charts = {};
+
+function setSyncStatus(state){
+  var el = document.getElementById('sync-status');
+  if(state==='ok'){ el.textContent='● Sincronizado'; el.className=''; el.style.cssText='font-size:12px;padding:3px 10px;border-radius:99px;background:#d1fae5;color:#1a7a4a;'; }
+  else if(state==='syncing'){ el.textContent='↻ Guardando...'; el.style.cssText='font-size:12px;padding:3px 10px;border-radius:99px;background:#fef3c7;color:#92400e;'; }
+  else { el.textContent='✕ Error al guardar'; el.style.cssText='font-size:12px;padding:3px 10px;border-radius:99px;background:#fee2e2;color:#b91c1c;'; }
+}
+
+// ============================================================
+// PERSISTENCIA
+// ============================================================
+async function saveCajaInterna(){
+  setSyncStatus('syncing');
+  try{ await sbUpsertReal('prestamos',{id:'caja_interna',data:cajaInterna,updated_at:new Date().toISOString()}); setSyncStatus('ok'); }
+  catch(e){ setSyncStatus('error'); console.error(e); }
+}
+async function saveHistorial(){
+  setSyncStatus('syncing');
+  try{ await sbUpsertReal('prestamos',{id:'historial_main',data:historialPrestamos,updated_at:new Date().toISOString()}); setSyncStatus('ok'); }
+  catch(e){ setSyncStatus('error'); console.error(e); }
+}
+async function savePatrimonio(){
+  setSyncStatus('syncing');
+  try{ await sbUpsertReal('prestamos',{id:'patrimonio_main',data:patrimonioBolsas,updated_at:new Date().toISOString()}); setSyncStatus('ok'); }
+  catch(e){ setSyncStatus('error'); console.error(e); }
+}
+async function saveLoans(){
+  setSyncStatus('syncing');
+  try{
+    await sbUpsertReal('prestamos',{id:'main', data:loans, updated_at:new Date().toISOString()});
+    setSyncStatus('ok');
+  }catch(e){ setSyncStatus('error'); console.error(e); }
+}
+async function saveCuotaLoans(){
+  setSyncStatus('syncing');
+  try{
+    await sbUpsertReal('cuotas_prestamos',{id:'main', data:cuotaLoans, updated_at:new Date().toISOString()});
+    setSyncStatus('ok');
+  }catch(e){ setSyncStatus('error'); console.error(e); }
+}
+function seedHistorial(){
+  return [{"id": "hist_ec_0", "nombre": "ROSA YOVERA 1", "fechaInicio": "2022-08-02", "fechaCierre": "2023-02-02", "montoInicial": 1000.0, "tasa": 0.03, "meses": 6.0, "intTotalGenerado": 180.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_1", "nombre": "ENMA DOLORIER", "fechaInicio": "2022-02-21", "fechaCierre": "2023-02-21", "montoInicial": 1000.0, "tasa": 0.1, "meses": 12.0, "intTotalGenerado": 640.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_2", "nombre": "ROSA YOVERA 2", "fechaInicio": "2022-09-12", "fechaCierre": "2023-01-12", "montoInicial": 500.0, "tasa": 0.0, "meses": 4.0, "intTotalGenerado": 0.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_3", "nombre": "PERCY 1", "fechaInicio": "2022-04-24", "fechaCierre": "2022-06-24", "montoInicial": 1000.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 400.0, "comisionTotal": 200.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_4", "nombre": "PERCY 2", "fechaInicio": "2022-07-09", "fechaCierre": "2022-12-09", "montoInicial": 1500.0, "tasa": 0.2, "meses": 5.0, "intTotalGenerado": 1000.0, "comisionTotal": 500.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_5", "nombre": "ROSA YOVERA 3", "fechaInicio": "2022-08-02", "fechaCierre": "2023-02-02", "montoInicial": 1000.0, "tasa": 0.03, "meses": 6.0, "intTotalGenerado": 180.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_6", "nombre": "PERCY 3", "fechaInicio": "2022-12-30", "fechaCierre": "2023-03-30", "montoInicial": 1000.0, "tasa": 0.2, "meses": 3.0, "intTotalGenerado": 390.0, "comisionTotal": 210.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_7", "nombre": "VICTOR 1", "fechaInicio": "2023-03-27", "fechaCierre": "2023-04-27", "montoInicial": 800.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 160.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_8", "nombre": "VICTOR 2", "fechaInicio": "2023-05-07", "fechaCierre": "2023-06-07", "montoInicial": 150.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 15.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_9", "nombre": "VICTOR 3", "fechaInicio": "2023-06-15", "fechaCierre": "2023-07-15", "montoInicial": 100.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 10.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_10", "nombre": "VICTOR 4", "fechaInicio": "2023-07-04", "fechaCierre": "2023-11-04", "montoInicial": 700.0, "tasa": 0.2, "meses": 4.0, "intTotalGenerado": 560.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_11", "nombre": "MAMÁ VICTOR", "fechaInicio": "2023-10-06", "fechaCierre": "2023-11-06", "montoInicial": 500.0, "tasa": 0.15, "meses": 1.0, "intTotalGenerado": 75.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_12", "nombre": "JHOSMAR DAVILA", "fechaInicio": "2023-01-04", "fechaCierre": "2023-02-04", "montoInicial": 1000.0, "tasa": 0.17, "meses": 1.0, "intTotalGenerado": 170.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_13", "nombre": "ESTEFANY ARRIETA 1", "fechaInicio": "2023-01-15", "fechaCierre": "2023-02-15", "montoInicial": 400.0, "tasa": 0.03, "meses": 1.0, "intTotalGenerado": 12.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_14", "nombre": "ESTEFANY ARRIETA 2", "fechaInicio": "2024-03-13", "fechaCierre": "2024-04-13", "montoInicial": 1000.0, "tasa": 0.05, "meses": 1.0, "intTotalGenerado": 25.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_15", "nombre": "ROSA YOVERA 4", "fechaInicio": "2023-05-23", "fechaCierre": "2024-05-23", "montoInicial": 7500.0, "tasa": 0.03, "meses": 12.0, "intTotalGenerado": 1462.5, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_16", "nombre": "SANDRA", "fechaInicio": "2024-04-03", "fechaCierre": "2024-05-03", "montoInicial": 600.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 84.0, "comisionTotal": 36.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_17", "nombre": "ANA YOVERA", "fechaInicio": "2024-04-21", "fechaCierre": "2024-05-21", "montoInicial": 300.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 42.0, "comisionTotal": 18.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_18", "nombre": "KARINA YOVERA", "fechaInicio": "2024-05-01", "fechaCierre": "2024-06-01", "montoInicial": 300.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 21.0, "comisionTotal": 9.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_19", "nombre": "Ana Yovera", "fechaInicio": "2024-04-10", "fechaCierre": "2024-06-10", "montoInicial": 300.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 84.0, "comisionTotal": 36.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_20", "nombre": "SANDRA 2", "fechaInicio": "2024-05-24", "fechaCierre": "2024-06-24", "montoInicial": 100.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 14.0, "comisionTotal": 6.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_21", "nombre": "KARINA YOVERA", "fechaInicio": "2024-05-19", "fechaCierre": "2024-06-19", "montoInicial": 100.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 14.0, "comisionTotal": 6.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_22", "nombre": "MIS ROSA", "fechaInicio": "2024-05-01", "fechaCierre": "2024-07-01", "montoInicial": 150.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 42.0, "comisionTotal": 18.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_23", "nombre": "(SANDRA)", "fechaInicio": "2024-06-11", "fechaCierre": "2024-07-11", "montoInicial": 300.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 42.0, "comisionTotal": 18.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_24", "nombre": "Mamá de Victor", "fechaInicio": "2024-01-30", "fechaCierre": "2024-06-30", "montoInicial": 1000.0, "tasa": 0.2, "meses": 5.0, "intTotalGenerado": 1000.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_25", "nombre": "ESTEFANY ARRIETA", "fechaInicio": "2024-05-17", "fechaCierre": "2024-06-17", "montoInicial": 200.0, "tasa": 0.05, "meses": 1.0, "intTotalGenerado": 20.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_26", "nombre": "MONICA SALINAS", "fechaInicio": "2024-05-12", "fechaCierre": "2024-07-12", "montoInicial": 110.0, "tasa": 0.0, "meses": 2.0, "intTotalGenerado": 0.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_27", "nombre": "Hermana Rosa", "fechaInicio": "2024-06-22", "fechaCierre": "2024-08-22", "montoInicial": 100.0, "tasa": 0.1, "meses": 2.0, "intTotalGenerado": 10.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_28", "nombre": "Ricardo Yovera", "fechaInicio": "2024-05-09", "fechaCierre": "2024-07-09", "montoInicial": 800.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 126.0, "comisionTotal": 54.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_29", "nombre": "KARINA YOVERA", "fechaInicio": "2024-05-19", "fechaCierre": "2024-07-19", "montoInicial": 100.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 14.0, "comisionTotal": 6.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_30", "nombre": "COCO (SANDRA)", "fechaInicio": "2024-04-21", "fechaCierre": "2024-07-21", "montoInicial": 800.0, "tasa": 0.2, "meses": 3.0, "intTotalGenerado": 336.0, "comisionTotal": 144.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_31", "nombre": "JHIOSMAR DÁVILA", "fechaInicio": "2024-01-27", "fechaCierre": "2024-07-27", "montoInicial": 3000.0, "tasa": 0.15, "meses": 6.0, "intTotalGenerado": 1575.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_32", "nombre": "JHAMPIER FIGUEREDO", "fechaInicio": "2024-09-14", "fechaCierre": "2024-09-14", "montoInicial": 400.0, "tasa": 0.2, "meses": 0.0, "intTotalGenerado": 10.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_33", "nombre": "MANA ROSA", "fechaInicio": "2024-08-27", "fechaCierre": "2024-09-27", "montoInicial": 120.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 12.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_34", "nombre": "KARINA", "fechaInicio": "2024-08-22", "fechaCierre": "2024-09-22", "montoInicial": 500.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 35.0, "comisionTotal": 15.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_35", "nombre": "RICARDO YOVERA", "fechaInicio": "2024-07-18", "fechaCierre": "2024-09-18", "montoInicial": 600.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 98.0, "comisionTotal": 42.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_36", "nombre": "MANA ESTEFANY", "fechaInicio": "2024-09-25", "fechaCierre": "2024-10-25", "montoInicial": 100.0, "tasa": 0.05, "meses": 1.0, "intTotalGenerado": 5.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_37", "nombre": "JHAMPIER", "fechaInicio": "2024-10-12", "fechaCierre": "2024-11-12", "montoInicial": 400.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 80.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_38", "nombre": "CUTO", "fechaInicio": "2024-01-05", "fechaCierre": "2024-11-05", "montoInicial": 500.0, "tasa": 0.2, "meses": 10.0, "intTotalGenerado": 990.0, "comisionTotal": 10.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_39", "nombre": "KARINA", "fechaInicio": "2024-11-12", "fechaCierre": "2024-11-12", "montoInicial": 500.0, "tasa": 0.05, "meses": 0.25, "intTotalGenerado": 18.0, "comisionTotal": 7.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_40", "nombre": "MANA ROSA", "fechaInicio": "2024-10-20", "fechaCierre": "2024-11-20", "montoInicial": 200.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 20.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_41", "nombre": "VICTOR", "fechaInicio": "2023-11-06", "fechaCierre": "2025-01-06", "montoInicial": 500.0, "tasa": 0.15, "meses": 14.0, "intTotalGenerado": 1000.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_42", "nombre": "ESTEFANY", "fechaInicio": "2024-12-11", "fechaCierre": "2025-01-11", "montoInicial": 200.0, "tasa": 0.05, "meses": 1.0, "intTotalGenerado": 10.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_43", "nombre": "KARINA", "fechaInicio": "2025-02-19", "fechaCierre": "2025-05-19", "montoInicial": 1000.0, "tasa": 0.2, "meses": 3.0, "intTotalGenerado": 400.0, "comisionTotal": 100.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_44", "nombre": "JUAN CARLOS", "fechaInicio": "2024-04-30", "fechaCierre": "2024-04-30", "montoInicial": 2000.0, "tasa": 0.0, "meses": 0.0, "intTotalGenerado": 100.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_45", "nombre": "JHOSMAR DÁVILA", "fechaInicio": "2024-10-17", "fechaCierre": "2025-03-17", "montoInicial": 2000.0, "tasa": 0.15, "meses": 5.0, "intTotalGenerado": 900.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_46", "nombre": "JHOSMAR", "fechaInicio": "2025-02-19", "fechaCierre": "2025-03-19", "montoInicial": 1500.0, "tasa": 0.15, "meses": 1.0, "intTotalGenerado": 225.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_47", "nombre": "MANA ROSA", "fechaInicio": "2024-12-24", "fechaCierre": "2025-03-24", "montoInicial": 100.0, "tasa": 0.1, "meses": 3.0, "intTotalGenerado": 30.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_48", "nombre": "JHAMPIER", "fechaInicio": "2025-02-08", "fechaCierre": "2025-04-08", "montoInicial": 350.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 140.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_49", "nombre": "MANA ROSA", "fechaInicio": "2025-04-27", "fechaCierre": "2025-05-27", "montoInicial": 100.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 10.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_50", "nombre": "Davis Alvarado", "fechaInicio": "2025-04-02", "fechaCierre": "2025-06-02", "montoInicial": 200.0, "tasa": 0.1, "meses": 2.0, "intTotalGenerado": 40.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_51", "nombre": "ELVA", "fechaInicio": "2025-03-16", "fechaCierre": "2025-05-16", "montoInicial": 500.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 210.0, "comisionTotal": 90.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_52", "nombre": "KARINA", "fechaInicio": "2025-03-18", "fechaCierre": "2025-06-18", "montoInicial": 1000.0, "tasa": 0.2, "meses": 3.0, "intTotalGenerado": 420.0, "comisionTotal": 180.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_53", "nombre": "SANDRA", "fechaInicio": "2025-01-07", "fechaCierre": "2025-09-07", "montoInicial": 3800.0, "tasa": 0.15, "meses": 8.0, "intTotalGenerado": 1646.9, "comisionTotal": 408.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_54", "nombre": "MANA ROSA", "fechaInicio": "2025-06-24", "fechaCierre": "2025-07-24", "montoInicial": 150.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 15.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_55", "nombre": "MAMÁ DE JHOSMAR", "fechaInicio": "2025-02-20", "fechaCierre": "2025-08-20", "montoInicial": 3500.0, "tasa": 0.15, "meses": 6.0, "intTotalGenerado": 1838.25, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_56", "nombre": "Tia Ani", "fechaInicio": "2025-08-11", "fechaCierre": "2025-09-11", "montoInicial": 300.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 48.0, "comisionTotal": 12.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_57", "nombre": "KARINA 2", "fechaInicio": "2025-07-04", "fechaCierre": "2025-08-04", "montoInicial": 1000.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 140.0, "comisionTotal": 60.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_58", "nombre": "KARINA", "fechaInicio": "2025-06-05", "fechaCierre": "2025-09-05", "montoInicial": 5000.0, "tasa": 0.1, "meses": 3.0, "intTotalGenerado": 800.0, "comisionTotal": 200.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_59", "nombre": "MANA ROSA", "fechaInicio": "2025-08-23", "fechaCierre": "2025-10-23", "montoInicial": 150.0, "tasa": 0.1, "meses": 2.0, "intTotalGenerado": 19.5, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_60", "nombre": "TIO RICARDO", "fechaInicio": "2025-08-09", "fechaCierre": "2025-11-09", "montoInicial": 500.0, "tasa": 0.2, "meses": 3.0, "intTotalGenerado": 176.0, "comisionTotal": 44.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_61", "nombre": "JEAN PIERE", "fechaInicio": "2025-09-25", "fechaCierre": "2025-11-25", "montoInicial": 500.0, "tasa": 0.15, "meses": 2.0, "intTotalGenerado": 150.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_62", "nombre": "KARINA", "fechaInicio": "2025-09-14", "fechaCierre": "2025-11-14", "montoInicial": 1000.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 320.0, "comisionTotal": 80.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_63", "nombre": "TIA ANI", "fechaInicio": "2025-11-01", "fechaCierre": "2025-12-01", "montoInicial": 150.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 24.0, "comisionTotal": 6.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_64", "nombre": "ROSA YOVERA", "fechaInicio": "2024-10-17", "fechaCierre": "2025-04-17", "montoInicial": 2000.0, "tasa": 0.03, "meses": 6.0, "intTotalGenerado": 210.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_65", "nombre": "KARINA", "fechaInicio": "2025-11-19", "fechaCierre": "2025-12-19", "montoInicial": 1000.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 160.0, "comisionTotal": 40.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_66", "nombre": "KARINA", "fechaInicio": "2025-10-20", "fechaCierre": "2025-12-20", "montoInicial": 300.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 96.0, "comisionTotal": 24.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_67", "nombre": "ROSA", "fechaInicio": "2025-12-14", "fechaCierre": "2026-01-14", "montoInicial": 100.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 10.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_68", "nombre": "DAVIS", "fechaInicio": "2025-12-16", "fechaCierre": "2026-01-16", "montoInicial": 200.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 20.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_69", "nombre": "GUSMAN - KARINA", "fechaInicio": "2025-11-30", "fechaCierre": "2026-01-30", "montoInicial": 500.0, "tasa": 0.2, "meses": 2.0, "intTotalGenerado": 160.0, "comisionTotal": 40.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_70", "nombre": "KARINA", "fechaInicio": "2025-12-30", "fechaCierre": "2026-01-30", "montoInicial": 300.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 24.0, "comisionTotal": 6.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_71", "nombre": "HUANCA", "fechaInicio": "2025-09-05", "fechaCierre": "2026-02-05", "montoInicial": 5800.0, "tasa": 0.032, "meses": 5.0, "intTotalGenerado": 800.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_72", "nombre": "JHOSMAR", "fechaInicio": "2025-10-16", "fechaCierre": "2026-02-16", "montoInicial": 3000.0, "tasa": 0.15, "meses": 4.0, "intTotalGenerado": 1125.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_73", "nombre": "KARINA", "fechaInicio": "2026-02-12", "fechaCierre": "2026-03-12", "montoInicial": 300.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 48.0, "comisionTotal": 12.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_74", "nombre": "DAVIS", "fechaInicio": "2026-02-09", "fechaCierre": "2026-03-09", "montoInicial": 200.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 20.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_75", "nombre": "KARINA", "fechaInicio": "2026-03-10", "fechaCierre": "2026-04-10", "montoInicial": 1000.0, "tasa": 0.2, "meses": 1.0, "intTotalGenerado": 160.0, "comisionTotal": 40.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_76", "nombre": "JHAMPIER", "fechaInicio": "2025-01-20", "fechaCierre": "2025-04-20", "montoInicial": 500.0, "tasa": 0.15, "meses": 3.0, "intTotalGenerado": 225.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_77", "nombre": "JOEL - KARINA", "fechaInicio": "2025-11-26", "fechaCierre": "2026-04-26", "montoInicial": 1000.0, "tasa": 0.2, "meses": 5.0, "intTotalGenerado": 800.0, "comisionTotal": 200.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_78", "nombre": "DAVIS", "fechaInicio": "2026-03-14", "fechaCierre": "2026-05-14", "montoInicial": 300.0, "tasa": 0.1, "meses": 2.0, "intTotalGenerado": 60.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}, {"id": "hist_ec_79", "nombre": "DAVIS", "fechaInicio": "2026-04-15", "fechaCierre": "2026-05-15", "montoInicial": 200.0, "tasa": 0.1, "meses": 1.0, "intTotalGenerado": 20.0, "comisionTotal": 0.0, "pagos": [], "tipo": "historico"}];
+}
+
+async function loadData(){
+  try{
+    var r1 = await sbGet('prestamos?id=eq.main'); loans = (r1[0]&&r1[0].data) ? r1[0].data : [];
+    var r2 = await sbGet('cuotas_prestamos?id=eq.main'); cuotaLoans = (r2[0]&&r2[0].data) ? r2[0].data : [];
+    var seeded = loans.length > 0;
+    if(!seeded){ loans=seedData(); cuotaLoans=seedCuotaData(); await saveLoans(); await saveCuotaLoans(); }
+    // migracion
+    var mig=false;
+    loans.forEach(function(l){
+      if(!l.abonosCapital){
+        var ab=[];
+        if(l.historialCapital&&l.historialCapital.length>1){ for(var i=1;i<l.historialCapital.length;i++) ab.push({id:uid(),fecha:l.historialCapital[i].fecha,monto:l.historialCapital[i-1].saldo-l.historialCapital[i].saldo}); }
+        else if(l.saldoActual!==undefined&&l.saldoActual!==l.monto){ var fc=(l.pagos&&l.pagos.length>0)?l.pagos[l.pagos.length-1].fecha:l.fechaInicio; ab.push({id:uid(),fecha:fc,monto:l.monto-l.saldoActual}); }
+        l.abonosCapital=ab; delete l.saldoActual; recomputeHistorial(l); mig=true;
+      }
+    });
+    if(mig) await saveLoans();
+
+    // Cargar historial
+    try{
+      var rh = await sbGet('prestamos?id=eq.historial_main');
+      historialPrestamos = (rh[0]&&rh[0].data) ? rh[0].data : [];
+      // Migración: si los registros tienen id viejo (hist_seed_) o no tienen tasa, forzar re-seed
+      var needsHistMigration = historialPrestamos.length>0 && historialPrestamos[0] && 
+        (historialPrestamos[0].tasa === undefined || (historialPrestamos[0].id && historialPrestamos[0].id.startsWith('hist_seed_')));
+      if(historialPrestamos.length===0||needsHistMigration){
+        historialPrestamos = seedHistorial();
+        await saveHistorial();
+      }
+    }catch(e){ console.error('Error historial',e); }
+
+    // Cargar caja interna
+    try{
+      var rc = await sbGet('prestamos?id=eq.caja_interna');
+      cajaInterna = (rc[0]&&rc[0].data) ? rc[0].data : null;
+      if(!cajaInterna){
+        cajaInterna = {"andrea": {"junta": [{"fecha": "2023-01-09", "abono": 0.0, "salida": 100.0, "motivo": "Pasajes de la U", "saldo": 1870.0}, {"fecha": "2023-01-17", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 1970.0}, {"fecha": "2023-03-03", "abono": 0.0, "salida": 100.0, "motivo": "viaje", "saldo": 2070.0}, {"fecha": "2023-04-30", "abono": 0.0, "salida": 50.0, "motivo": "gym", "saldo": 2120.0}, {"fecha": "2023-05-31", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 2220.0}, {"fecha": "2023-07-26", "abono": 0.0, "salida": 80.0, "motivo": "pago de deudas", "saldo": 2300.0}, {"fecha": "2023-07-27", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 2400.0}, {"fecha": "2024-04-21", "abono": 0.0, "salida": 500.0, "motivo": "pagar deuda", "saldo": 2900.0}, {"fecha": "2024-08-03", "abono": 0.0, "salida": 300.0, "motivo": "compras centro", "saldo": 3200.0}, {"fecha": "2024-10-02", "abono": 0.0, "salida": 200.0, "motivo": "pagar deuda", "saldo": 3400.0}, {"fecha": "2024-10-12", "abono": 0.0, "salida": 34.0, "motivo": "DUCHA", "saldo": 3434.0}, {"fecha": "2024-10-05", "abono": 0.0, "salida": 1200.0, "motivo": "celular", "saldo": 4634.0}, {"fecha": "2024-08-06", "abono": 0.0, "salida": 250.0, "motivo": "GYM", "saldo": 4884.0}, {"fecha": "2025-04-13", "abono": 0.0, "salida": 400.0, "motivo": "ropa", "saldo": 5284.0}, {"fecha": "2025-06-27", "abono": 0.0, "salida": 60.0, "motivo": "pasaje viaje", "saldo": 5344.0}, {"fecha": "2025-08-01", "abono": 0.0, "salida": 600.0, "motivo": "CABLES Y DUCHA", "saldo": 5944.0}, {"fecha": "2025-10-02", "abono": 0.0, "salida": 500.0, "motivo": "SUELDO", "saldo": 6444.0}], "intereses": [{"fecha": "2023-08-06", "abono": 0.0, "salida": 200.0, "motivo": "promoción", "saldo": 200.0}, {"fecha": "2023-08-12", "abono": 0.0, "salida": 100.0, "motivo": "promoción", "saldo": 300.0}, {"fecha": "2023-09-20", "abono": 0.0, "salida": 50.0, "motivo": "gastos", "saldo": 350.0}, {"fecha": "2023-09-25", "abono": 0.0, "salida": 50.0, "motivo": "gastos", "saldo": 400.0}, {"fecha": "2023-09-26", "abono": 0.0, "salida": 50.0, "motivo": "regalo", "saldo": 450.0}, {"fecha": "2023-10-19", "abono": 0.0, "salida": 100.0, "motivo": "pasaje", "saldo": 550.0}, {"fecha": "2023-11-07", "abono": 0.0, "salida": 150.0, "motivo": "GYM", "saldo": 700.0}, {"fecha": "2023-12-15", "abono": 0.0, "salida": 275.0, "motivo": "ropa y pintura", "saldo": 975.0}, {"fecha": "2023-12-07", "abono": 0.0, "salida": 100.0, "motivo": "viaje a Huánuco", "saldo": 1075.0}, {"fecha": "2023-12-08", "abono": 0.0, "salida": 75.0, "motivo": "pasaje", "saldo": 1150.0}, {"fecha": "2024-05-05", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 1050.0}, {"fecha": "18/25/2024", "abono": 0.0, "salida": 30.0, "motivo": "ROPA", "saldo": 1080.0}, {"fecha": "2024-05-26", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 980.0}, {"fecha": "2024-06-02", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 880.0}, {"fecha": "2024-06-23", "abono": 0.0, "salida": 20.0, "motivo": "pasaje", "saldo": 900.0}, {"fecha": "2024-06-30", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 800.0}, {"fecha": "2024-07-01", "abono": 0.0, "salida": 50.0, "motivo": "COMIDA", "saldo": 850.0}, {"fecha": "2024-08-05", "abono": 0.0, "salida": 200.0, "motivo": "pasaje", "saldo": 1050.0}, {"fecha": "2024-09-07", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 950.0}, {"fecha": "2024-12-22", "abono": 0.0, "salida": 600.0, "motivo": "deuda de tarjeta", "saldo": 1550.0}, {"fecha": "2024-01-18", "abono": 0.0, "salida": 150.0, "motivo": "deuda de tarjeta", "saldo": 1700.0}, {"fecha": "2025-02-01", "abono": 0.0, "salida": 360.0, "motivo": "deuda de tarjeta, marcianos, baño, viaje", "saldo": 2060.0}, {"fecha": "2025-05-10", "abono": 0.0, "salida": 50.0, "motivo": "libros y perfume", "saldo": 2110.0}, {"fecha": "-", "abono": 0.0, "salida": 11.5, "motivo": "COMPRAS", "saldo": 2121.5}, {"fecha": "2025-06-27", "abono": 0.0, "salida": 321.5, "motivo": "gastos viaje", "saldo": 2443.0}, {"fecha": "2025-08-06", "abono": 500.0, "salida": 0.0, "motivo": "", "saldo": 1943.0}, {"fecha": "2025-09-15", "abono": 0.0, "salida": 90.0, "motivo": "ROPA", "saldo": 2033.0}, {"fecha": "2026-01-24", "abono": 300.0, "salida": 0.0, "motivo": "PAGO", "saldo": 1733.0}, {"fecha": "2026-02-22", "abono": 1000.0, "salida": 0.0, "motivo": "pago", "saldo": 733.0}, {"fecha": "2026-03-24", "abono": 0.0, "salida": 300.0, "motivo": "ALISADO", "saldo": 1033.0}, {"fecha": "2026-05-31", "abono": 0.0, "salida": 600.0, "motivo": "ROPERO", "saldo": 1633.0}], "saldo_junta": 6444, "saldo_intereses": 1633, "saldo_inicial_junta": 1770, "saldo_inicial_intereses": 0}, "gustavo": {"junta": [{"fecha": "2023-01-09", "abono": 0.0, "salida": 100.0, "motivo": "Pasajes de la U", "saldo": 2300.0}, {"fecha": "2023-01-17", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 2400.0}, {"fecha": "2023-03-03", "abono": 0.0, "salida": 300.0, "motivo": "pagar deudas", "saldo": 2700.0}, {"fecha": "2023-03-31", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 2600.0}, {"fecha": "2023-04-21", "abono": 0.0, "salida": 300.0, "motivo": "saco de box", "saldo": 2900.0}, {"fecha": "2023-04-26", "abono": 300.0, "salida": 0.0, "motivo": "", "saldo": 2600.0}, {"fecha": "2023-04-30", "abono": 0.0, "salida": 50.0, "motivo": "gym", "saldo": 2650.0}, {"fecha": "2023-05-31", "abono": 0.0, "salida": 300.0, "motivo": "saco de box", "saldo": 2950.0}, {"fecha": "2023-05-31", "abono": 300.0, "salida": 0.0, "motivo": "saco de box", "saldo": 2650.0}, {"fecha": "2023-05-31", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 2750.0}, {"fecha": "2023-06-30", "abono": 400.0, "salida": 0.0, "motivo": "", "saldo": 2350.0}, {"fecha": "2023-07-01", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 2450.0}, {"fecha": "2024-04-21", "abono": 500.0, "salida": 0.0, "motivo": "", "saldo": 1950.0}, {"fecha": "2024-08-03", "abono": 0.0, "salida": 300.0, "motivo": "compras centro", "saldo": 2250.0}, {"fecha": "2024-08-06", "abono": 300.0, "salida": 0.0, "motivo": "devolucion de préstamo papá", "saldo": 1950.0}, {"fecha": "2024-09-14", "abono": 150.0, "salida": 0.0, "motivo": "devolucion de préstamo papá", "saldo": 1800.0}, {"fecha": "2024-10-12", "abono": 150.0, "salida": 0.0, "motivo": "devolucion de préstamo papá", "saldo": 1650.0}, {"fecha": "2024-10-06", "abono": 0.0, "salida": 800.0, "motivo": "completar sueldo", "saldo": 2450.0}, {"fecha": "2024-10-10", "abono": 0.0, "salida": 34.0, "motivo": "DUCHA", "saldo": 2484.0}, {"fecha": "2024-10-22", "abono": 800.0, "salida": 0.0, "motivo": "devolución de presvtamo sueldo", "saldo": 1684.0}, {"fecha": "2024-12-21", "abono": 184.0, "salida": 0.0, "motivo": "pago deuda", "saldo": 1500.0}, {"fecha": "2024-08-06", "abono": 0.0, "salida": 200.0, "motivo": "GYM", "saldo": 1700.0}, {"fecha": "2025-04-13", "abono": 0.0, "salida": 660.0, "motivo": "ropa", "saldo": 2360.0}, {"fecha": "2025-06-27", "abono": 0.0, "salida": 60.0, "motivo": "pasaje viaje", "saldo": 2420.0}, {"fecha": "2025-07-28", "abono": 120.0, "salida": 0.0, "motivo": "GRATI", "saldo": 2300.0}, {"fecha": "2025-09-14", "abono": 0.0, "salida": 350.0, "motivo": "SUELDO", "saldo": 2650.0}, {"fecha": "2026-04-20", "abono": 1000.0, "salida": 0.0, "motivo": "PAGO DE LIQUIDACION", "saldo": 1650.0}], "intereses": [{"fecha": "2023-08-06", "abono": 0.0, "salida": 400.0, "motivo": "promoción", "saldo": 400.0}, {"fecha": "2023-08-12", "abono": 0.0, "salida": 100.0, "motivo": "prestamo", "saldo": 500.0}, {"fecha": "2023-09-25", "abono": 0.0, "salida": 300.0, "motivo": "prestamo carmen alfaro", "saldo": 800.0}, {"fecha": "2023-04-26", "abono": 0.0, "salida": 50.0, "motivo": "regalo", "saldo": 850.0}, {"fecha": "2023-09-30", "abono": 0.0, "salida": 100.0, "motivo": "pasaje trabajo(vino tía ani)", "saldo": 950.0}, {"fecha": "2023-08-29", "abono": 0.0, "salida": 100.0, "motivo": "pasaje trabajo", "saldo": 1050.0}, {"fecha": "2023-09-30", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 1150.0}, {"fecha": "2023-11-07", "abono": 0.0, "salida": 100.0, "motivo": "gym", "saldo": 1250.0}, {"fecha": "2023-11-08", "abono": 100.0, "salida": 0.0, "motivo": "", "saldo": 1150.0}, {"fecha": "2023-12-15", "abono": 0.0, "salida": 475.0, "motivo": "ropa y pintura", "saldo": 1625.0}, {"fecha": "2024-03-10", "abono": 300.0, "salida": 0.0, "motivo": "", "saldo": 1325.0}, {"fecha": "2024-05-18", "abono": 0.0, "salida": 130.0, "motivo": "ROPA Y ZAPATILLAS", "saldo": 1455.0}, {"fecha": "2024-06-01", "abono": 0.0, "salida": 100.0, "motivo": "TAMBO", "saldo": 1555.0}, {"fecha": "2024-06-15", "abono": 0.0, "salida": 100.0, "motivo": "PRESTAMO TIO PIPO", "saldo": 1655.0}, {"fecha": "2024-06-30", "abono": 0.0, "salida": 750.0, "motivo": "PARA COMPLETAR SUELDO", "saldo": 2405.0}, {"fecha": "2024-06-10", "abono": 250.0, "salida": 0.0, "motivo": "", "saldo": 2155.0}, {"fecha": "2024-06-10", "abono": 400.0, "salida": 0.0, "motivo": "", "saldo": 1755.0}, {"fecha": "2024-07-23", "abono": 800.0, "salida": 0.0, "motivo": "", "saldo": 955.0}, {"fecha": "2024-08-06", "abono": 0.0, "salida": 500.0, "motivo": "", "saldo": 1455.0}, {"fecha": "2024-08-10", "abono": 0.0, "salida": 100.0, "motivo": "compras", "saldo": 1555.0}, {"fecha": "2024-08-18", "abono": 300.0, "salida": 0.0, "motivo": "completando sueldo", "saldo": 1255.0}, {"fecha": "2024-08-24", "abono": 0.0, "salida": 200.0, "motivo": "Adelanto de internet", "saldo": 1455.0}, {"fecha": "2024-09-01", "abono": 0.0, "salida": 430.0, "motivo": "completar sueldo", "saldo": 1885.0}, {"fecha": "2024-09-07", "abono": 50.0, "salida": 0.0, "motivo": "pago internet 50", "saldo": 1835.0}, {"fecha": "2024-09-22", "abono": 0.0, "salida": 120.0, "motivo": "pasaje", "saldo": 1955.0}, {"fecha": "2024-09-28", "abono": 0.0, "salida": 50.0, "motivo": "REGALO", "saldo": 2005.0}, {"fecha": "2024-10-22", "abono": 220.0, "salida": 0.0, "motivo": "devolución de préstamo sueldo", "saldo": 1785.0}, {"fecha": "2024-10-27", "abono": 50.0, "salida": 0.0, "motivo": "pago internet 50", "saldo": 1735.0}, {"fecha": "2024-11-10", "abono": 0.0, "salida": 1000.0, "motivo": "completar sueldo", "saldo": 2735.0}, {"fecha": "2024-11-10", "abono": 50.0, "salida": 0.0, "motivo": "pago internet 50", "saldo": 2685.0}, {"fecha": "2024-11-17", "abono": 1000.0, "salida": 0.0, "motivo": "devolución de préstamo sueldo", "saldo": 1685.0}, {"fecha": "2024-12-22", "abono": 185.0, "salida": 0.0, "motivo": "pago prestamo", "saldo": 1500.0}, {"fecha": "2024-01-18", "abono": 50.0, "salida": 0.0, "motivo": "pago internet 50", "saldo": 1450.0}, {"fecha": "2025-02-01", "abono": 0.0, "salida": 60.0, "motivo": "marcianos, baño", "saldo": 1510.0}, {"fecha": "2025-05-07", "abono": 0.0, "salida": 500.0, "motivo": "sueldo", "saldo": 2010.0}, {"fecha": "2025-05-10", "abono": 0.0, "salida": 100.0, "motivo": "perfumes", "saldo": 2110.0}, {"fecha": "-", "abono": 0.0, "salida": 11.5, "motivo": "COMPRAS", "saldo": 2121.5}, {"fecha": "2025-06-16", "abono": 0.0, "salida": 120.0, "motivo": "ropa + regalo", "saldo": 2241.5}, {"fecha": "2025-06-27", "abono": 0.0, "salida": 321.5, "motivo": "gastos viaje", "saldo": 2563.0}, {"fecha": "2025-07-28", "abono": 263.0, "salida": 0.0, "motivo": "GRATI", "saldo": 2300.0}, {"fecha": "2025-09-15", "abono": 0.0, "salida": 100.0, "motivo": "ROPA", "saldo": 2400.0}, {"fecha": "2025-10-02", "abono": 0.0, "salida": 250.0, "motivo": "PASAJE", "saldo": 2650.0}, {"fecha": "2026-03-07", "abono": 0.0, "salida": 390.0, "motivo": "ROPAA", "saldo": 3040.0}, {"fecha": "2026-05-01", "abono": 0.0, "salida": 600.0, "motivo": "VIAJE OXAPAMPA", "saldo": 3640.0}, {"fecha": "2026-06-06", "abono": 0.0, "salida": 2150.0, "motivo": "Salud(GASTRO-DERMA), abr y may.", "saldo": 5790.0}, {"fecha": "2026-06-06", "abono": 0.0, "salida": 450.0, "motivo": "Licencia de conducir.", "saldo": 6240.0}, {"fecha": "2026-06-06", "abono": 0.0, "salida": 600.0, "motivo": "Cubrir pensión abr y may.", "saldo": 6840.0}], "saldo_junta": 1650, "saldo_intereses": 6840, "saldo_inicial_junta": 2200, "saldo_inicial_intereses": 0}}
+        await saveCajaInterna();
+      }
+    }catch(e){ console.error('Error caja interna',e); }
+
+    // Cargar patrimonio
+    try{
+      var rp = await sbGet('prestamos?id=eq.patrimonio_main');
+      patrimonioBolsas = (rp[0]&&rp[0].data) ? rp[0].data : [];
+      if(patrimonioBolsas.length===0){
+        patrimonioBolsas = [
+          {id:'bol_1',nombre:'Efectivo disponible',tipo:'efectivo',monto:9165,fecha:todayISO(),notas:'Capital líquido en cuenta'},
+          {id:'bol_2',nombre:'Inversiones (acciones/ETFs)',tipo:'inversion',monto:0,fecha:todayISO(),notas:'Por iniciar en broker'}
+        ];
+        await savePatrimonio();
+      }
+    }catch(e){ console.error('Error patrimonio',e); }
+
+  }catch(e){ console.error('Error cargando datos',e); document.getElementById('status-banner').textContent='Error conectando con la base de datos. Verifica tu conexión.'; document.getElementById('status-banner').style.display='block'; }
+}
+
+// ============================================================
+// UTILIDADES
+// ============================================================
+function uid(){ return 'p_'+Date.now()+'_'+Math.floor(Math.random()*10000); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function addMonths(dateStr,n){ if(!dateStr||dateStr==='-') return null; var d=new Date(dateStr+'T00:00:00'); if(isNaN(d.getTime())) return null; d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
+function fmtMoney(n){ n=Math.round((n||0)*100)/100; return 'S/ '+n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDate(s){ if(!s||s==='-') return '-'; var d=new Date(s+'T00:00:00'); if(isNaN(d.getTime())) return '-'; return d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/(1000*60*60*24)); }
+
+// ============================================================
+// MODAL
+// ============================================================
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); document.getElementById('modal-box').innerHTML=''; }
+document.getElementById('modal-overlay').addEventListener('click',function(e){ if(e.target.id==='modal-overlay') closeModal(); });
+function showConfirmModal(msg,onConfirm,btnLabel,btnClass,titulo){
+  var label=btnLabel||'Sí, eliminar';
+  var cls=btnClass||'danger';
+  var title=titulo||'Confirmar eliminación';
+  document.getElementById('modal-box').innerHTML='<div class="modal-title">'+title+'</div><div class="modal-body"><p style="font-size:14px;">'+msg+'</p></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="'+cls+'">'+label+'</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=function(){ closeModal(); onConfirm(); };
+}
+function showInputModal(title,onSubmit){
+  document.getElementById('modal-box').innerHTML='<div class="modal-title">'+title+'</div><div class="modal-body"><div class="form-group"><label>Monto abonado (S/)</label><input type="number" id="mi" placeholder="0.00" /></div><div class="form-group"><label>Fecha del pago</label><input type="date" id="md" value="'+todayISO()+'" /></div></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Registrar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mi').focus();
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=function(){ var v=parseFloat(document.getElementById('mi').value),f=document.getElementById('md').value; if(isNaN(v)||v<=0||!f) return; closeModal(); onSubmit(v,f); };
+}
+function showDateModal(title, defaultDate, onSubmit){
+  document.getElementById('modal-box').innerHTML='<div class="modal-title">'+title+'</div><div class="modal-body"><div class="form-group"><label>Fecha del pago</label><input type="date" id="md" value="'+(defaultDate||todayISO())+'" /></div></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Confirmar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('md').focus();
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=function(){ var f=document.getElementById('md').value; if(!f) return; closeModal(); onSubmit(f); };
+}
+function showEditAbonoModal(monto,fecha,onSubmit){
+  document.getElementById('modal-box').innerHTML='<div class="modal-title">Editar abono a capital</div><div class="modal-body"><div class="form-group"><label>Monto abonado (S/)</label><input type="number" id="mi" value="'+monto+'" /></div><div class="form-group"><label>Fecha del abono</label><input type="date" id="md" value="'+fecha+'" /></div></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mi').focus();
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=function(){ var v=parseFloat(document.getElementById('mi').value),f=document.getElementById('md').value; if(isNaN(v)||v<=0||!f) return; closeModal(); onSubmit(v,f); };
+}
+
+// ============================================================
+// HISTORIAL DE CAPITAL
+// ============================================================
+function getHistorial(loan){ return (loan.historialCapital&&loan.historialCapital.length>0)?loan.historialCapital:[{fecha:loan.fechaInicio,saldo:loan.monto}]; }
+function recomputeHistorial(loan){
+  var ab=(loan.abonosCapital||[]).slice().sort(function(a,b){return a.fecha<b.fecha?-1:1;});
+  var hist=[{fecha:loan.fechaInicio,saldo:loan.monto}],saldo=loan.monto;
+  ab.forEach(function(a){ saldo=Math.max(0,saldo-a.monto); hist.push({fecha:a.fecha,saldo:saldo,abonoId:a.id,abonoMonto:a.monto}); });
+  loan.historialCapital=hist; if(saldo===0) loan.estado='pagado'; return hist;
+}
+function saldoEnFecha(loan,fecha){ var h=getHistorial(loan),s=h[0].saldo; for(var i=0;i<h.length;i++){ if(h[i].fecha<=fecha) s=h[i].saldo; else break; } return s; }
+function saldoActualDe(loan){ var h=getHistorial(loan); return h[h.length-1].saldo; }
+
+// Devuelve el % de comisión vigente (último tramo aplicable a la cuota actual)
+function comisionVigente(loan){
+  var tramos=loan.comisionTramos;
+  if(!tramos||tramos.length===0) return loan.comisionPct||0;
+  var cuotaActual=(loan.pagos||[]).length+1;
+  var ordenados=tramos.slice().sort(function(a,b){return b.desdeCuota-a.desdeCuota;});
+  var aplicable=ordenados.find(function(t){return cuotaActual>=t.desdeCuota;});
+  return aplicable?aplicable.pct:(loan.comisionPct||0);
+}
+
+// Devuelve el % de comisión aplicable a una cuota dada, considerando tramos
+function getComisionPct(loan, numCuota){
+  var tramos=loan.comisionTramos;
+  if(!tramos||tramos.length===0) return loan.comisionPct||0;
+  // Ordenar tramos por desdeCuota descendente y tomar el primero que aplique
+  var aplicable=tramos.slice().sort(function(a,b){return b.desdeCuota-a.desdeCuota;})
+    .find(function(t){return numCuota>=t.desdeCuota;});
+  return aplicable?aplicable.pct:(loan.comisionPct||0);
+}
+
+// ============================================================
+// CRONOGRAMAS
+// ============================================================
+function buildSchedule(loan){
+  if(!loan.fechaInicio || !loan.monto || isNaN(loan.monto)) return [];
+  try {
+  var sch=[],today=todayISO(),m=0;
+  while(true){ var nd=addMonths(loan.fechaInicio,m+1); if(!nd||(nd>today&&m>=(loan.pagos||[]).length)) break; m++; if(m>600||nd>today) break; }
+  var total=Math.max(m,(loan.pagos||[]).length);
+  total=Math.max(total,(loan.pagos||[]).length+1);
+  for(var i=1;i<=total;i++){
+    var due=addMonths(loan.fechaInicio,i),s=saldoEnFecha(loan,due);
+    // Si saldo es 0 y no hay pago registrado para esta cuota, no generar más cuotas
+    if(s<=0){
+      var pagoCuota=(loan.pagos||[]).find(function(p){return p.cuota===i;});
+      if(!pagoCuota) break;
+    }
+    var it=Math.round((s||0)*(loan.tasa||0)),com=Math.round(it*(getComisionPct(loan,i)/100));
+    var pago=(loan.pagos||[]).find(function(p){return p.cuota===i;});
+    sch.push({cuota:i,fechaVencimiento:due,saldo:s,interesTotal:it,comision:com,interesReal:it-com,pagado:pago?true:false,fechaPago:pago?pago.fecha:null});
+  }
+  return sch;
+  } catch(e) { console.error('Error buildSchedule para', loan.nombre, e); return []; }
+}
+function buildCuotaSchedule(loan){
+  var sch=[],cap=loan.monto/loan.numCuotas,saldo=loan.monto;
+  for(var i=1;i<=loan.numCuotas;i++){
+    var due=addMonths(loan.fechaInicio,i),int=Math.round(saldo*loan.tasa),c=Math.round(cap);
+    if(i===loan.numCuotas) c=Math.round(saldo);
+    var pago=(loan.pagos||[]).find(function(p){return p.cuota===i;});
+    sch.push({cuota:i,fechaVencimiento:due,saldoAntes:Math.round(saldo),capital:c,interes:int,cuotaTotal:c+int,pagado:pago?true:false,fechaPago:pago?pago.fecha:null});
+    saldo-=c;
+  }
+  return sch;
+}
+function loanStatus(loan){
+  if(loan.estado==='pagado') return{label:'Pagado',color:'neutral'};
+  var p=buildSchedule(loan).find(function(s){return !s.pagado;});
+  if(!p) return{label:'Al día',color:'success'};
+  if(todayISO()>p.fechaVencimiento) return{label:'Mora '+daysBetween(p.fechaVencimiento,todayISO())+'d',color:'danger'};
+  return{label:'Al día',color:'success'};
+}
+function cuotaStatus(loan){
+  if(loan.estado==='pagado') return{label:'Pagado',color:'neutral'};
+  var p=buildCuotaSchedule(loan).find(function(s){return !s.pagado;});
+  if(!p) return{label:'Completado',color:'success'};
+  if(todayISO()>p.fechaVencimiento) return{label:'Mora '+daysBetween(p.fechaVencimiento,todayISO())+'d',color:'danger'};
+  return{label:'Al día',color:'success'};
+}
+function loanTotals(loan){ var s=buildSchedule(loan),p=s.filter(function(x){return x.pagado;}); return{interesRealGenerado:p.reduce(function(a,x){return a+x.interesReal;},0),comisionTotal:p.reduce(function(a,x){return a+x.comision;},0),cuotasPagadas:p.length,cuotasTotal:s.length}; }
+function cuotaTotals(loan){ var s=buildCuotaSchedule(loan),p=s.filter(function(x){return x.pagado;}); return{interesTotal:p.reduce(function(a,x){return a+x.interes;},0),cuotasPagadas:p.length,cuotasTotal:s.length}; }
+function badge(st){ return '<span class="badge badge-'+st.color+'">'+st.label+'</span>'; }
+
+// ============================================================
+// SEED DATA
+// ============================================================
+function seedData(){
+  var seeds=[
+    {nombre:'Percy',monto:1000,tasa:0.20,comisionPct:35,fechaInicio:'2023-06-11',pagosFechas:['2023-07-28','2023-08-17','2023-09-17','2023-10-15','2023-11-14','2024-01-04','2024-01-19','2024-02-16','2024-03-20','2024-04-17','2024-05-16','2024-06-20','2024-07-13','2024-08-13','2024-09-15','2024-10-16','2024-11-25','2024-12-22','2025-01-13','2025-02-13','2025-03-19','2025-04-19','2025-05-16','2025-06-15','2025-07-18','2025-08-16','2025-09-14','2025-10-14','2025-11-16','2025-12-10','2026-01-15','2025-02-15','2026-03-23','2026-04-23','2026-05-17'],abonos:[{fecha:'2024-11-11',monto:500}]},
+    {nombre:'Sandra',monto:300,tasa:0.20,comisionPct:20,fechaInicio:'2025-12-26',pagosFechas:['2026-01-30','2026-02-26','2026-04-05','2026-04-26','2026-05-26'],abonos:[]},
+    {nombre:'Karina (Joel)',monto:1500,tasa:0.20,comisionPct:20,fechaInicio:'2026-01-06',pagosFechas:['2026-02-15','2026-04-07','2026-04-13','2026-05-22'],abonos:[]},
+    {nombre:'Karina (Rosa)',monto:300,tasa:0.20,comisionPct:20,fechaInicio:'2026-05-16',pagosFechas:[],abonos:[]},
+    {nombre:'Karina - moto',monto:1500,tasa:0.20,comisionPct:20,fechaInicio:'2026-05-19',pagosFechas:[],abonos:[]},
+    {nombre:'Davis 1',monto:300,tasa:0.10,comisionPct:0,fechaInicio:'2026-05-19',pagosFechas:[],abonos:[]},
+    {nombre:'Davis 2',monto:200,tasa:0.10,comisionPct:0,fechaInicio:'2026-05-29',pagosFechas:[],abonos:[]},
+    {nombre:'Jean Pier',monto:400,tasa:0.15,comisionPct:0,fechaInicio:'2026-05-13',pagosFechas:['2026-06-01'],abonos:[]},
+    {nombre:'Juan - tía Ani',monto:300,tasa:0.20,comisionPct:0,fechaInicio:'2026-06-07',pagosFechas:[],abonos:[]},
+    {nombre:'Víctor Farías',monto:1200,tasa:0.20,comisionPct:0,fechaInicio:'2026-06-13',pagosFechas:[],abonos:[]}
+  ];
+  return seeds.map(function(s){
+    var pagos=s.pagosFechas.map(function(f,i){return{cuota:i+1,fecha:f};});
+    var ab=s.abonos.map(function(a){return{id:uid(),fecha:a.fecha,monto:a.monto};});
+    var l={id:uid(),nombre:s.nombre,monto:s.monto,tasa:s.tasa,comisionPct:s.comisionPct,fechaInicio:s.fechaInicio,abonosCapital:ab,estado:'activo',pagos:pagos};
+    recomputeHistorial(l); return l;
+  });
+}
+function seedCuotaData(){
+  return[
+    {id:uid(),nombre:'Rosa Yovera - equipo',monto:3600,tasa:0,numCuotas:6,fechaInicio:'2025-11-12',estado:'activo',pagos:['2025-12-27','2026-03-25','2026-04-16','2026-05-16'].map(function(f,i){return{cuota:i+1,fecha:f};})},
+    {id:uid(),nombre:'Tío de Jhiosmar',monto:2500,tasa:0.15,numCuotas:3,fechaInicio:'2026-06-02',estado:'activo',pagos:[]}
+  ];
+}
+
+// ============================================================
+// CHART PLUGIN
+// ============================================================
+var valueLabelPlugin={id:'valueLabel',afterDatasetsDraw:function(chart){
+  var ctx=chart.ctx;
+  chart.data.datasets.forEach(function(ds,i){
+    var meta=chart.getDatasetMeta(i); if(meta.hidden) return;
+    meta.data.forEach(function(bar,idx){
+      var val=ds.data[idx]; if(!val) return;
+      ctx.save(); ctx.fillStyle='#e8eaf0'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(Math.round(val).toLocaleString('es-PE'),bar.x,bar.y-6); ctx.restore();
+    });
+  });
+}};
+
+// Helper: suma/resta interés neto a la bolsa Efectivo disponible
+async function addInteresEfectivo(monto){
+  var bol=patrimonioBolsas.find(function(b){return b.id==='bol_1';});
+  if(bol) bol.monto=Math.round((bol.monto+monto)*100)/100;
+  await savePatrimonio();
+}
+
+function metricCard(l,v){ return '<div class="metric-card"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>'; }
+function destroyChart(k){ if(charts[k]){charts[k].destroy();charts[k]=null;} }
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard(){
+  var el=document.getElementById('view-dashboard');
+  var filtro=el._filtro||'todos';
+  var act=loans.filter(function(l){return l.estado!=='pagado';}),cuAct=cuotaLoans.filter(function(l){return l.estado!=='pagado';});
+
+  // Filtrar según selección para métricas y gráficas
+  var actF=act.filter(function(l){
+    if(filtro==='todos'||filtro==='abierto') return true;
+    if(filtro==='aldia') return loanStatus(l).color==='success';
+    if(filtro==='mora') return loanStatus(l).color==='danger';
+    if(filtro==='cuotas') return false;
+    return true;
+  });
+  var cuActF=cuAct.filter(function(l){
+    if(filtro==='todos'||filtro==='cuotas') return true;
+    if(filtro==='aldia') return cuotaStatus(l).color==='success';
+    if(filtro==='mora') return cuotaStatus(l).color==='danger';
+    if(filtro==='abierto') return false;
+    return true;
+  });
+
+  var capAb=actF.reduce(function(a,l){return a+saldoActualDe(l);},0);
+  var capCu=cuActF.reduce(function(a,l){var sc=buildCuotaSchedule(l),p=sc.find(function(s){return !s.pagado;});return a+(p?p.saldoAntes:0);},0);
+  var intN=0,comT=0,mora=0;
+  actF.forEach(function(l){ try{var t=loanTotals(l);intN+=t.interesRealGenerado;comT+=t.comisionTotal;if(loanStatus(l).color==='danger')mora++;}catch(e){console.error('Error totales préstamo',l.nombre,e);} });
+  cuActF.forEach(function(l){ try{intN+=cuotaTotals(l).interesTotal;if(cuotaStatus(l).color==='danger')mora++;}catch(e){console.error('Error totales cuota',l.nombre,e);} });
+
+  var filtroLabel=filtro==='todos'?'':' · '+({'abierto':'Plazo abierto','cuotas':'En cuotas','aldia':'Al día','mora':'En mora'}[filtro]||'');
+  var html='<div class="metric-grid">'+metricCard('Capital activo'+filtroLabel,fmtMoney(capAb+capCu))+metricCard('Interés neto generado'+filtroLabel,fmtMoney(intN))+metricCard('Comisión Rosa generada'+filtroLabel,fmtMoney(comT))+metricCard('Préstamos en mora'+filtroLabel,String(mora))+'</div>';
+
+  if(act.length===0&&cuAct.length===0){ html+='<p style="color:var(--text-secondary)">No hay préstamos activos. Ve a "Nuevo a plazo" para empezar.</p>'; el.innerHTML=html; return; }
+
+  if(actF.length>0 || cuActF.length>0){
+    html+='<div class="two-col"><div><div class="chart-title">Saldo de capital por prestatario<span style="font-size:11px;color:var(--text-secondary);font-weight:400;">'+filtroLabel+'</span></div><div class="chart-wrap" style="height:280px;"><canvas id="chartCapital"></canvas></div></div>';
+    html+='<div><div class="chart-title">Interés neto vs comisión acumulada<span style="font-size:11px;color:var(--text-secondary);font-weight:400;">'+filtroLabel+'</span></div><div class="chart-wrap" style="height:280px;"><canvas id="chartInteres"></canvas></div><div class="legend"><div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div>Interés neto</div><div class="legend-item"><div class="legend-dot" style="background:#EF9F27;"></div>Comisión Rosa</div></div></div></div>';
+  }
+  html+='<div id="dash-cap-detail"></div>';
+
+  // ── Resumen de préstamos activos ──
+  function proximaFechaVenc(loan, tipo){
+    if(tipo==='cuota'){var sch=buildCuotaSchedule(loan);var pend=sch.find(function(s){return !s.pagado;});return pend?pend.fechaVencimiento:null;}
+    var pagos=loan.pagos||[];return addMonths(loan.fechaInicio, pagos.length+1);
+  }
+  function estadoConDias(loan, tipo){
+    var st=tipo==='cuota'?cuotaStatus(loan):loanStatus(loan);
+    if(st.color==='red') return st;
+    if(st.color==='success'||st.label==='Al día'){var proxFecha=proximaFechaVenc(loan,tipo);if(proxFecha){var dias=daysBetween(todayISO(),proxFecha);return {label:'Al día - '+Math.max(0,dias)+'d',color:'success'};}}
+    return st;
+  }
+  var rows=[];
+  loans.filter(function(l){return l.estado!=='pagado';}).forEach(function(l){
+    var st=estadoConDias(l,'abierto'),t=loanTotals(l);
+    rows.push({tipo:'Plazo abierto',nombre:l.nombre,saldo:saldoActualDe(l),tasa:(l.tasa*100).toFixed(0)+'%',comision:comisionVigente(l)+'%',cuotas:t.cuotasPagadas+'/'+t.cuotasTotal,estado:st});
+  });
+  cuotaLoans.filter(function(l){return l.estado!=='pagado';}).forEach(function(l){
+    var st=estadoConDias(l,'cuota'),t=cuotaTotals(l),sc=buildCuotaSchedule(l),p=sc.find(function(s){return !s.pagado;});
+    rows.push({tipo:'En cuotas',nombre:l.nombre,saldo:p?p.saldoAntes:0,tasa:(l.tasa*100).toFixed(0)+'%',comision:'-',cuotas:t.cuotasPagadas+'/'+t.cuotasTotal,estado:st});
+  });
+
+  if(rows.length>0){
+    var nAbierto=loans.filter(function(l){return l.estado!=='pagado';}).length;
+    var nCuotas=cuotaLoans.filter(function(l){return l.estado!=='pagado';}).length;
+    var nMora=rows.filter(function(r){return r.estado.color==='danger';}).length;
+    var nAlDia=rows.filter(function(r){return r.estado.color==='success';}).length;
+    function resBtn(key,label,n,color){
+      var active=filtro===key;
+      var COLORS={red:{bg:'#991b1b',border:'#ef4444',textI:'var(--text-danger)'},green:{bg:'#166534',border:'#22c55e',textI:'var(--text-success)'},blue:{bg:'#1d4ed8',border:'#3b82f6',textI:'var(--text)'}};
+      var col=COLORS[color]||{bg:'#374151',border:'#6b7280',textI:'var(--text)'};
+      return '<button class="res-filtro" data-key="'+key+'" style="padding:16px 24px;font-size:14px;font-weight:500;border-radius:var(--radius);border:2px solid '+(active?col.border:'var(--border)')+';background:'+(active?col.bg:'var(--bg-secondary)')+';color:'+(active?'#fff':col.textI)+';cursor:pointer;min-width:120px;text-align:center;transition:all .15s;">'+label+'<br><span style="font-size:28px;font-weight:700;display:block;margin-top:4px;">'+n+'</span></button>';
+    }
+    html+='<div style="margin-top:24px;"><div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:28px;">';
+    html+=resBtn('todos','Total',rows.length,'blue');
+    html+=resBtn('abierto','Plazo abierto',nAbierto,'');
+    html+=resBtn('cuotas','En cuotas',nCuotas,'');
+    html+=resBtn('aldia','Al día',nAlDia,'green');
+    html+=resBtn('mora','En mora',nMora,'red');
+    html+='</div>';
+    var rowsF=rows.filter(function(r){
+      if(filtro==='todos') return true;
+      if(filtro==='abierto') return r.tipo==='Plazo abierto';
+      if(filtro==='cuotas') return r.tipo==='En cuotas';
+      if(filtro==='aldia') return r.estado.color==='success';
+      if(filtro==='mora') return r.estado.color==='danger';
+      return true;
+    });
+    html+='<div style="overflow-x:auto;"><table><thead><tr><th>Tipo</th><th>Nombre</th><th>Saldo</th><th>Tasa</th><th>Comisión</th><th>Cuotas</th><th>Estado</th></tr></thead><tbody>';
+    rowsF.forEach(function(r){html+='<tr><td style="color:var(--text-secondary);">'+r.tipo+'</td><td>'+r.nombre+'</td><td>'+fmtMoney(r.saldo)+'</td><td>'+r.tasa+'</td><td>'+r.comision+'</td><td>'+r.cuotas+'</td><td>'+badge(r.estado)+'</td></tr>';});
+    if(rowsF.length===0) html+='<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:20px;">Sin resultados.</td></tr>';
+    html+='</tbody></table></div></div>';
+  }
+
+  el.innerHTML=html;
+
+  // Combinar actF + cuActF para los charts (ya vienen filtrados)
+  var chartAll = actF.map(function(l){return {nombre:l.nombre,capital:saldoActualDe(l),ir:loanTotals(l).interesRealGenerado,com:loanTotals(l).comisionTotal,status:loanStatus(l)};});
+  cuActF.forEach(function(l){
+    var sc=buildCuotaSchedule(l),p=sc.find(function(s){return !s.pagado;});
+    chartAll.push({nombre:l.nombre,capital:p?p.saldoAntes:0,ir:cuotaTotals(l).interesTotal,com:0,status:cuotaStatus(l)});
+  });
+
+  if(chartAll.length>0){
+    var labels=chartAll.map(function(x){return x.nombre;}),montos=chartAll.map(function(x){return x.capital;});
+    setTimeout(function(){
+    destroyChart('capital');
+    charts.capital=new Chart(document.getElementById('chartCapital'),{type:'bar',data:{labels:labels,datasets:[{label:'Capital',data:montos,backgroundColor:chartAll.map(function(x){return x.status.color==='danger'?'#ef4444':'#378ADD';}),hoverBackgroundColor:'#5ab4ff'}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.label+': '+fmtMoney(c.raw);}}}},scales:{y:{beginAtZero:true,ticks:{color:'#8b92a9'}}},onClick:function(evt,els){if(!els||!els.length){var dd=document.getElementById('dash-cap-detail');if(dd)dd.innerHTML='';return;}var idx=els[0].index,item=chartAll[idx];var loan=act.find(function(l){return l.nombre===item.nombre;});if(!loan)return;var t=loanTotals(loan),saldo=saldoActualDe(loan),st=loanStatus(loan);var dd=document.getElementById('dash-cap-detail');if(!dd)return;dd.innerHTML='<div style="background:var(--bg);border:1px solid var(--accent);border-radius:var(--radius);padding:14px 18px;margin-top:12px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span style="font-weight:600;font-size:15px;">'+loan.nombre+'</span><button id="dd-cap-close" style="font-size:12px;padding:3px 10px;">✕</button></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;font-size:13px;"><div><div style="color:var(--text-secondary);font-size:11px;">Capital activo</div><div style="font-weight:600;font-size:16px;">'+fmtMoney(saldo)+'</div></div><div><div style="color:var(--text-secondary);font-size:11px;">Tasa mensual</div><div style="font-weight:600;font-size:16px;">'+(loan.tasa*100).toFixed(0)+'%</div></div><div><div style="color:var(--text-secondary);font-size:11px;">Interés neto acum.</div><div style="font-weight:600;font-size:16px;color:var(--text-success);">'+fmtMoney(t.interesRealGenerado)+'</div></div><div><div style="color:var(--text-secondary);font-size:11px;">Comisión Rosa</div><div style="font-weight:600;font-size:16px;color:#EF9F27;">'+fmtMoney(t.comisionTotal)+'</div></div><div><div style="color:var(--text-secondary);font-size:11px;">Cuotas pagadas</div><div style="font-weight:600;font-size:16px;">'+t.cuotasPagadas+'/'+t.cuotasTotal+'</div></div><div><div style="color:var(--text-secondary);font-size:11px;">Estado</div><div style="margin-top:2px;">'+badge(st)+'</div></div></div></div>';document.getElementById('dd-cap-close').onclick=function(){dd.innerHTML='';};dd.scrollIntoView({behavior:'smooth',block:'nearest'});}},plugins:[valueLabelPlugin]});
+    var ir=chartAll.map(function(x){return x.ir;}),co=chartAll.map(function(x){return x.com;});
+    destroyChart('interes');
+    charts.interes=new Chart(document.getElementById('chartInteres'),{type:'bar',data:{labels:labels,datasets:[{label:'Interés neto',data:ir,backgroundColor:'#1D9E75'},{label:'Comisión Rosa',data:co,backgroundColor:'#EF9F27'}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{color:'#8b92a9'}}}},plugins:[valueLabelPlugin]});
+    },50);
+  }
+  el.querySelectorAll('.res-filtro').forEach(function(b){
+    b.onclick=function(){el._filtro=b.getAttribute('data-key');renderDashboard();};
+  });
+}
+
+// ============================================================
+// PRÉSTAMOS (PLAZO ABIERTO)
+// ============================================================
+function renderPrestamos(){
+  var el=document.getElementById('view-prestamos');
+  if(loans.length===0){el.innerHTML='<p style="color:var(--text-secondary);">No hay préstamos registrados.</p>';return;}
+  var html='';
+  loans.slice().sort(function(a,b){return (a.estado==='pagado')-(b.estado==='pagado');}).forEach(function(loan){
+    var st=loanStatus(loan),sch=buildSchedule(loan),tot=loanTotals(loan),saldo=saldoActualDe(loan);
+    var ab=(loan.abonosCapital||[]).slice().sort(function(a,b){return a.fecha<b.fecha?-1:1;});
+    // Próximo vencimiento
+    var proxInfo='';
+    if(loan.estado!=='pagado'){
+      var proxCuota=sch.find(function(s){return !s.pagado;});
+      if(proxCuota){
+        var diasProx=daysBetween(todayISO(),proxCuota.fechaVencimiento);
+        var proxColor=diasProx<0?'var(--text-danger)':diasProx<=3?'#EF9F27':'var(--text-success)';
+        proxInfo='<span style="font-size:12px;color:'+proxColor+';font-weight:500;">⏱ '+(diasProx<0?'Venció hace '+Math.abs(diasProx)+'d':diasProx===0?'Vence hoy':'Vence en '+diasProx+'d')+' ('+fmtDate(proxCuota.fechaVencimiento)+')</span>';
+      }
+    }
+    html+='<div class="card"><div class="loan-header"><div><div class="loan-name">'+loan.nombre+'</div><div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Saldo '+fmtMoney(saldo)+' · '+(loan.tasa*100).toFixed(0)+'% mensual</div></div><div style="display:flex;gap:8px;align-items:center;">'+proxInfo+badge(st)+(loan.estado!=='pagado'?'<button class="edit-loan-btn" data-loan="'+loan.id+'" style="font-size:12px;padding:4px 10px;">✎ Editar</button>':'')+'</div></div>';
+    var comVigente=comisionVigente(loan);
+    var tieneTramos=(loan.comisionTramos&&loan.comisionTramos.length>0);
+    html+='<div class="loan-meta"><span>Cuotas: '+tot.cuotasPagadas+'/'+tot.cuotasTotal+'</span><span>Inicio: '+fmtDate(loan.fechaInicio)+'</span><span class="comision-row">Comisión Rosa: <input type="number" class="comision-input" data-loan="'+loan.id+'" value="'+comVigente+'" style="width:58px;padding:4px;'+(tieneTramos?'opacity:0.5;':'')+'" '+(tieneTramos?'disabled title="Configurado por tramos — usa Editar para cambiar"':'')+' />%'+(tieneTramos?' <span style="font-size:10px;color:var(--text-secondary);">(tramos)</span>':'')+'</span></div>';
+    if(ab.length>0){
+      html+='<div class="abonos-section"><div class="sub-title">Pagos de capital registrados</div>';
+      ab.forEach(function(a){html+='<div class="abono-row"><span>'+fmtMoney(a.monto)+' — '+fmtDate(a.fecha)+'</span><button class="editabono-btn" data-loan="'+loan.id+'" data-abono="'+a.id+'">Editar</button><button class="deleteabono-btn danger" data-loan="'+loan.id+'" data-abono="'+a.id+'">Eliminar</button></div>';});
+      html+='</div>';
+    }
+    html+='<div class="scrollable"><table><thead><tr><th>Cuota</th><th>Vence</th><th>Int. total</th><th>Comisión</th><th>Int. neto</th><th>Estado</th></tr></thead><tbody>';
+    sch.forEach(function(s){
+      var mora=!s.pagado&&todayISO()>s.fechaVencimiento;
+      html+='<tr><td>'+s.cuota+'</td><td>'+fmtDate(s.fechaVencimiento)+'</td><td>'+fmtMoney(s.interesTotal)+'</td><td>'+fmtMoney(s.comision)+'</td><td>'+fmtMoney(s.interesReal)+'</td><td>'+(s.pagado?'<button class="unpay-btn success-btn" data-loan="'+loan.id+'" data-cuota="'+s.cuota+'">✓ deshacer</button>':(mora?'<button class="pay-btn danger" data-loan="'+loan.id+'" data-cuota="'+s.cuota+'">Atrasado</button>':'<button class="pay-btn" data-loan="'+loan.id+'" data-cuota="'+s.cuota+'">Pagar</button>'))+'</td></tr>';
+    });
+    html+='</tbody></table></div><div class="actions">';
+    if(loan.estado!=='pagado') html+='<button class="capital-btn" data-loan="'+loan.id+'">Registrar pago de capital</button><button class="close-btn" data-loan="'+loan.id+'">Cerrar préstamo</button>';
+    else html+='<button class="reopen-btn" data-loan="'+loan.id+'">Reabrir préstamo</button>';
+    html+='<button class="delete-btn danger" data-loan="'+loan.id+'">Eliminar</button></div></div>';
+  });
+  el.innerHTML=html;
+  el.querySelectorAll('.pay-btn').forEach(function(btn){btn.onclick=async function(){
+    var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;
+    var numCuota=parseInt(btn.getAttribute('data-cuota'));
+    var sch=buildSchedule(l);
+    var cuotaItem=sch.find(function(s){return s.cuota===numCuota;});
+    l.pagos=l.pagos||[];l.pagos.push({cuota:numCuota,fecha:todayISO()});
+    if(cuotaItem) await addInteresEfectivo(cuotaItem.interesReal);
+    await saveLoans();refresh();
+  };});
+  el.querySelectorAll('.unpay-btn').forEach(function(btn){btn.onclick=async function(){
+    var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;
+    var c=parseInt(btn.getAttribute('data-cuota'));
+    var sch=buildSchedule(l);
+    var cuotaItem=sch.find(function(s){return s.cuota===c;});
+    l.pagos=(l.pagos||[]).filter(function(p){return p.cuota!==c;});
+    if(cuotaItem) await addInteresEfectivo(-cuotaItem.interesReal);
+    await saveLoans();refresh();
+  };});
+  el.querySelectorAll('.comision-input').forEach(function(inp){inp.onchange=async function(){
+    var l=loans.find(function(x){return x.id===inp.getAttribute('data-loan');});
+    if(!l)return;
+    if(l.comisionTramos&&l.comisionTramos.length>0){return;}
+    var v=parseFloat(inp.value);
+    if(isNaN(v)) return;
+    // Calcular diferencia de interés neto por cuotas ya pagadas
+    var interesAntes=loanTotals(l).interesRealGenerado;
+    l.comisionPct=v;
+    var interesDespues=loanTotals(l).interesRealGenerado;
+    var diff=interesDespues-interesAntes;
+    if(diff!==0) await addInteresEfectivo(diff);
+    await saveLoans();refresh();
+  };});
+  el.querySelectorAll('.edit-loan-btn').forEach(function(btn){btn.onclick=function(){
+    var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;
+    var box=document.getElementById('modal-box');
+    box.innerHTML='<div class="modal-title">Editar préstamo — '+l.nombre+'</div><div class="modal-body">'+
+      '<div class="form-group"><label>Nombre</label><input type="text" id="el-nombre" value="'+l.nombre+'" /></div>'+
+      '<div class="form-group"><label>Monto original (S/)</label><input type="number" id="el-monto" value="'+l.monto+'" /></div>'+
+      '<div class="form-group"><label>Tasa mensual (%)</label><input type="number" id="el-tasa" value="'+(l.tasa*100).toFixed(0)+'" /></div>'+
+      '<div class="form-group"><label>Fecha de inicio</label><input type="date" id="el-fecha" value="'+l.fechaInicio+'" /></div>'+
+      '<div class="form-group"><label>% Comisión Rosa (base)</label><input type="number" id="el-com" value="'+(l.comisionPct||0)+'" /></div>'+
+      '<div class="form-group"><label style="display:flex;justify-content:space-between;">Tramos de comisión <button id="el-add-tramo" style="font-size:11px;padding:2px 8px;">+ Agregar tramo</button></label>'+
+      '<div id="el-tramos-list" style="display:flex;flex-direction:column;gap:6px;margin-top:4px;"></div>'+
+      '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Define % diferente desde cierta cuota. Ej: cuota 1→35%, cuota 18→30%</div></div>'+
+      '</div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar cambios</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+
+    // Renderizar tramos existentes
+    var tramos=(l.comisionTramos||[]).slice().sort(function(a,b){return a.desdeCuota-b.desdeCuota;});
+    function renderTramos(){
+      var cont=document.getElementById('el-tramos-list');
+      if(!cont) return;
+      cont.innerHTML='';
+      tramos.forEach(function(t,idx){
+        var row=document.createElement('div');
+        row.style.cssText='display:flex;gap:6px;align-items:center;';
+        row.innerHTML='<span style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">Desde cuota</span>'+
+          '<input type="number" value="'+t.desdeCuota+'" style="width:60px;padding:4px;" data-idx="'+idx+'" class="tr-desde" />'+
+          '<span style="font-size:12px;color:var(--text-secondary);">→</span>'+
+          '<input type="number" value="'+t.pct+'" style="width:60px;padding:4px;" data-idx="'+idx+'" class="tr-pct" />'+
+          '<span style="font-size:12px;color:var(--text-secondary);">%</span>'+
+          '<button data-idx="'+idx+'" class="tr-del" style="font-size:11px;padding:2px 8px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer;">✕</button>';
+        cont.appendChild(row);
+      });
+      cont.querySelectorAll('.tr-desde').forEach(function(inp){inp.oninput=function(){tramos[parseInt(inp.getAttribute('data-idx'))].desdeCuota=parseInt(inp.value)||1;};});
+      cont.querySelectorAll('.tr-pct').forEach(function(inp){inp.oninput=function(){tramos[parseInt(inp.getAttribute('data-idx'))].pct=parseFloat(inp.value)||0;};});
+      cont.querySelectorAll('.tr-del').forEach(function(btn){btn.onclick=function(){tramos.splice(parseInt(btn.getAttribute('data-idx')),1);renderTramos();};});
+    }
+    renderTramos();
+    document.getElementById('el-add-tramo').onclick=function(){tramos.push({desdeCuota:1,pct:0});renderTramos();};
+
+    document.getElementById('mc').onclick=closeModal;
+    document.getElementById('mok').onclick=async function(){
+      var nombre=document.getElementById('el-nombre').value.trim();
+      var montoNuevo=parseFloat(document.getElementById('el-monto').value);
+      var tasa=parseFloat(document.getElementById('el-tasa').value);
+      var fecha=document.getElementById('el-fecha').value;
+      var com=parseFloat(document.getElementById('el-com').value)||0;
+      if(!nombre||isNaN(tasa)||!fecha||isNaN(montoNuevo)){alert('Completa todos los campos.');return;}
+      // Ajustar efectivo por diferencia de monto
+      var diff=l.monto-montoNuevo;
+      if(diff!==0) await addInteresEfectivo(diff);
+      l.nombre=nombre; l.monto=montoNuevo; l.tasa=tasa/100; l.fechaInicio=fecha; l.comisionPct=com;
+      l.comisionTramos=tramos.length>0?tramos.slice().sort(function(a,b){return a.desdeCuota-b.desdeCuota;}):[];
+      recomputeHistorial(l);
+      closeModal(); await saveLoans(); refresh();
+    };
+  };});
+  el.querySelectorAll('.capital-btn').forEach(function(btn){btn.onclick=function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;showInputModal('Saldo actual: '+fmtMoney(saldoActualDe(l))+'. Monto a abonar al capital:',async function(m,f){l.abonosCapital=l.abonosCapital||[];l.abonosCapital.push({id:uid(),fecha:f,monto:m});recomputeHistorial(l);await addInteresEfectivo(m);await saveLoans();refresh();});};});
+  el.querySelectorAll('.editabono-btn').forEach(function(btn){btn.onclick=function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;var ab=(l.abonosCapital||[]).find(function(a){return a.id===btn.getAttribute('data-abono');});if(!ab)return;var montoAnterior=ab.monto;showEditAbonoModal(ab.monto,ab.fecha,async function(m,f){var diff=m-montoAnterior;ab.monto=m;ab.fecha=f;recomputeHistorial(l);await addInteresEfectivo(diff);await saveLoans();refresh();});};});
+  el.querySelectorAll('.deleteabono-btn').forEach(function(btn){btn.onclick=function(){showConfirmModal('¿Eliminar este abono? Se recalculará el saldo.',async function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;var ab=(l.abonosCapital||[]).find(function(a){return a.id===btn.getAttribute('data-abono');});var montoAbono=ab?ab.monto:0;l.abonosCapital=(l.abonosCapital||[]).filter(function(a){return a.id!==btn.getAttribute('data-abono');});if(l.estado==='pagado')l.estado='activo';recomputeHistorial(l);await addInteresEfectivo(-montoAbono);await saveLoans();refresh();});};});
+  el.querySelectorAll('.close-btn').forEach(function(btn){btn.onclick=function(){
+    var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});
+    if(!l)return;
+    showConfirmModal('¿Cerrar el préstamo de <b>'+l.nombre+'</b>? Se moverá al Historial con los datos actuales.',async function(){
+    var sch=buildSchedule(l);
+    var mesesCerrados=sch.filter(function(s){return s.pagado;}).length;
+    var saldoRestante=saldoActualDe(l);
+    historialPrestamos.push({
+      id:'hist_'+Date.now(),
+      nombre:l.nombre,
+      fechaInicio:l.fechaInicio,
+      fechaCierre:todayISO(),
+      montoInicial:l.monto,
+      tasa:l.tasa,
+      meses:mesesCerrados,
+      intTotalGenerado:loanTotals(l).interesRealGenerado,
+      comisionTotal:loanTotals(l).comisionTotal,
+      pagos:[],
+      tipo:'historico'
+    });
+    await saveHistorial();
+    // El saldo restante vuelve al efectivo al cerrar
+    if(saldoRestante>0) await addInteresEfectivo(saldoRestante);
+    l.estado='pagado';
+    await saveLoans();
+    refresh();
+    },'Sí, cerrar','primary','Confirmar cierre');
+  };});
+  el.querySelectorAll('.reopen-btn').forEach(function(btn){btn.onclick=function(){
+    var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});
+    if(!l)return;
+    showConfirmModal('¿Reabrir el préstamo de <b>'+l.nombre+'</b>?',async function(){
+      var saldo=saldoActualDe(l);
+      var interesNeto=loanTotals(l).interesRealGenerado;
+      // Al reabrir: descontar el saldo (vuelve a estar prestado) y revertir intereses cobrados
+      await addInteresEfectivo(-(saldo+interesNeto));
+      l.estado='activo';
+      await saveLoans();refresh();
+    },'Sí, reabrir','primary','Confirmar reapertura');
+  };});
+  el.querySelectorAll('.delete-btn').forEach(function(btn){btn.onclick=function(){var lid=btn.getAttribute('data-loan'),l=loans.find(function(x){return x.id===lid;});showConfirmModal('¿Eliminar el préstamo de <b>'+(l?l.nombre:'')+'</b>? Esta acción no se puede deshacer.',async function(){
+    if(l&&l.estado!=='pagado'){
+      var saldo=saldoActualDe(l);
+      var interesNeto=loanTotals(l).interesRealGenerado;
+      // Devolver capital y restar intereses cobrados
+      await addInteresEfectivo(saldo-interesNeto);
+    }
+    loans=loans.filter(function(x){return x.id!==lid;});
+    await saveLoans();refresh();});};});
+}
+
+// ============================================================
+// CUOTAS
+// ============================================================
+function renderCuotas(){
+  var el=document.getElementById('view-cuotas');
+  if(cuotaLoans.length===0){el.innerHTML='<p style="color:var(--text-secondary);">No hay préstamos en cuotas registrados.</p>';return;}
+  var html='';
+  cuotaLoans.slice().sort(function(a,b){return (a.estado==='pagado')-(b.estado==='pagado');}).forEach(function(loan){
+    var st=cuotaStatus(loan),sch=buildCuotaSchedule(loan),tot=cuotaTotals(loan);
+    // Próximo vencimiento cuotas
+    var proxInfoC='';
+    if(loan.estado!=='pagado'){
+      var proxCuotaC=sch.find(function(s){return !s.pagado;});
+      if(proxCuotaC){
+        var diasProxC=daysBetween(todayISO(),proxCuotaC.fechaVencimiento);
+        var proxColorC=diasProxC<0?'var(--text-danger)':diasProxC<=3?'#EF9F27':'var(--text-success)';
+        proxInfoC='<span style="font-size:12px;color:'+proxColorC+';font-weight:500;">⏱ '+(diasProxC<0?'Venció hace '+Math.abs(diasProxC)+'d':diasProxC===0?'Vence hoy':'Vence en '+diasProxC+'d')+' ('+fmtDate(proxCuotaC.fechaVencimiento)+')</span>';
+      }
+    }
+    html+='<div class="card"><div class="loan-header"><div><div class="loan-name">'+loan.nombre+'</div><div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Capital '+fmtMoney(loan.monto)+' en '+loan.numCuotas+' cuotas · '+(loan.tasa*100).toFixed(0)+'% mensual sobre saldo</div></div><div style="display:flex;gap:8px;align-items:center;">'+proxInfoC+badge(st)+(loan.estado!=='pagado'?'<button class="edit-cuota-btn" data-loan="'+loan.id+'" style="font-size:12px;padding:4px 10px;">✎ Editar</button>':'')+'</div></div>';
+    html+='<div class="loan-meta"><span>Cuotas: '+tot.cuotasPagadas+'/'+tot.cuotasTotal+'</span><span>Inicio: '+fmtDate(loan.fechaInicio)+'</span></div>';
+    html+='<div class="scrollable"><table><thead><tr><th>Cuota</th><th>Vence</th><th>Capital</th><th>Interés</th><th>Cuota total</th><th>Estado</th></tr></thead><tbody>';
+    sch.forEach(function(s){var mora=!s.pagado&&todayISO()>s.fechaVencimiento;html+='<tr><td>'+s.cuota+'</td><td>'+fmtDate(s.fechaVencimiento)+'</td><td>'+fmtMoney(s.capital)+'</td><td>'+fmtMoney(s.interes)+'</td><td>'+fmtMoney(s.cuotaTotal)+'</td><td>'+(s.pagado?'<button class="unpaycuota-btn success-btn" data-loan="'+loan.id+'" data-cuota="'+s.cuota+'">✓ deshacer</button>':(mora?'<button class="paycuota-btn danger" data-loan="'+loan.id+'" data-cuota="'+s.cuota+'">Atrasado</button>':'<button class="paycuota-btn" data-loan="'+loan.id+'" data-cuota="'+s.cuota+'">Pagar</button>'))+'</td></tr>';});
+    html+='</tbody></table></div><div class="actions">'+(loan.estado!=='pagado'?'<button class="closecuota-btn" data-loan="'+loan.id+'">Cerrar préstamo</button>':'<button class="reopencuota-btn" data-loan="'+loan.id+'">Reabrir préstamo</button>')+'<button class="deletecuota-btn danger" data-loan="'+loan.id+'">Eliminar</button></div></div>';
+  });
+  el.innerHTML=html;
+  el.querySelectorAll('.paycuota-btn').forEach(function(btn){btn.onclick=function(){
+    var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});
+    if(!l)return;
+    var numCuota=parseInt(btn.getAttribute('data-cuota'));
+    var sch=buildCuotaSchedule(l);
+    var cuotaItem=sch.find(function(s){return s.cuota===numCuota;});
+    var defaultFecha=cuotaItem?cuotaItem.fechaVencimiento:todayISO();
+    showDateModal('Registrar pago — Cuota '+numCuota+' de '+l.nombre, defaultFecha, async function(fecha){
+      l.pagos=l.pagos||[];
+      l.pagos.push({cuota:numCuota,fecha:fecha});
+      if(cuotaItem) await addInteresEfectivo(cuotaItem.interes);
+      if(l.pagos.length>=l.numCuotas) l.estado='pagado';
+      await saveCuotaLoans();
+      refresh();
+    });
+  };});
+  el.querySelectorAll('.unpaycuota-btn').forEach(function(btn){btn.onclick=async function(){
+    var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;
+    var c=parseInt(btn.getAttribute('data-cuota'));
+    var sch=buildCuotaSchedule(l);
+    var cuotaItem=sch.find(function(s){return s.cuota===c;});
+    l.pagos=(l.pagos||[]).filter(function(p){return p.cuota!==c;});
+    l.estado='activo';
+    if(cuotaItem) await addInteresEfectivo(-cuotaItem.interes);
+    await saveCuotaLoans();refresh();
+  };});
+  el.querySelectorAll('.closecuota-btn').forEach(function(btn){btn.onclick=function(){
+    var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});
+    if(!l)return;
+    showConfirmModal('¿Cerrar el préstamo en cuotas de <b>'+l.nombre+'</b>?',async function(){
+      var sc=buildCuotaSchedule(l);
+      var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);
+      var tot=cuotaTotals(l);
+      historialPrestamos.push({id:'hist_'+Date.now(),nombre:l.nombre+' (cuotas)',fechaInicio:l.fechaInicio,fechaCierre:todayISO(),montoInicial:l.monto,tasa:l.tasa,meses:l.numCuotas,intTotalGenerado:tot.interesTotal,comisionTotal:0,pagos:[],tipo:'cuotas'});
+      await saveHistorial();
+      // Capital pendiente vuelve al efectivo
+      if(capitalPendiente>0) await addInteresEfectivo(capitalPendiente);
+      l.estado='pagado';
+      await saveCuotaLoans();
+      refresh();
+    },'Sí, cerrar','primary','Confirmar cierre');
+  };});
+  el.querySelectorAll('.reopencuota-btn').forEach(function(btn){btn.onclick=function(){
+    var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});
+    if(!l)return;
+    showConfirmModal('¿Reabrir el préstamo en cuotas de <b>'+l.nombre+'</b>?',async function(){
+      var sc=buildCuotaSchedule(l);
+      var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);
+      if(capitalPendiente>0) await addInteresEfectivo(-capitalPendiente);
+      l.estado='activo';
+      await saveCuotaLoans();refresh();
+    },'Sí, reabrir','primary','Confirmar reapertura');
+  };});
+  el.querySelectorAll('.edit-cuota-btn').forEach(function(btn){btn.onclick=function(){
+    var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;
+    var box=document.getElementById('modal-box');
+    box.innerHTML='<div class="modal-title">Editar préstamo — '+l.nombre+'</div><div class="modal-body">'+
+      '<div class="form-group"><label>Nombre</label><input type="text" id="ec-nombre" value="'+l.nombre+'" /></div>'+
+      '<div class="form-group"><label>Tasa mensual (%)</label><input type="number" id="ec-tasa" value="'+(l.tasa*100).toFixed(0)+'" /></div>'+
+      '<div class="form-group"><label>Fecha de inicio</label><input type="date" id="ec-fecha" value="'+l.fechaInicio+'" /></div>'+
+      '<div class="form-group"><label>Número de cuotas</label><input type="number" id="ec-ncuotas" value="'+l.numCuotas+'" /></div>'+
+      '</div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar cambios</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('mc').onclick=closeModal;
+    document.getElementById('mok').onclick=async function(){
+      var nombre=document.getElementById('ec-nombre').value.trim();
+      var tasa=parseFloat(document.getElementById('ec-tasa').value);
+      var fecha=document.getElementById('ec-fecha').value;
+      var ncuotas=parseInt(document.getElementById('ec-ncuotas').value);
+      if(!nombre||isNaN(tasa)||!fecha||isNaN(ncuotas)){alert('Completa todos los campos.');return;}
+      l.nombre=nombre; l.tasa=tasa/100; l.fechaInicio=fecha; l.numCuotas=ncuotas;
+      closeModal(); await saveCuotaLoans(); refresh();
+    };
+  };});
+  el.querySelectorAll('.deletecuota-btn').forEach(function(btn){btn.onclick=function(){var lid=btn.getAttribute('data-loan'),l=cuotaLoans.find(function(x){return x.id===lid;});showConfirmModal('¿Eliminar el préstamo en cuotas de <b>'+(l?l.nombre:'')+'</b>?',async function(){
+    if(l&&l.estado!=='pagado'){
+      var sc=buildCuotaSchedule(l);
+      var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);
+      var interesNeto=cuotaTotals(l).interesTotal;
+      // Devolver capital pendiente y restar intereses cobrados
+      await addInteresEfectivo(capitalPendiente-interesNeto);
+    }
+    cuotaLoans=cuotaLoans.filter(function(x){return x.id!==lid;});await saveCuotaLoans();refresh();});};});
+}
+
+// ============================================================
+// FORMULARIOS
+// ============================================================
+function fG(label,type,id,ph,val){ return '<div class="form-group"><label>'+label+'</label><input type="'+type+'" id="'+id+'" placeholder="'+(ph||'')+'" '+(val!==undefined?'value="'+val+'"':'')+' /></div>'; }
+
+function renderNuevo(){
+  document.getElementById('view-nuevo').innerHTML='<div class="card" style="max-width:560px;"><div class="section-title">Registrar nuevo préstamo (plazo abierto)</div><div class="form-grid">'+fG('Nombre del prestatario','text','f-nombre','Ej. Percy')+fG('Monto prestado (S/)','number','f-monto','1000')+fG('Tasa mensual (%)','number','f-tasa','20')+fG('Fecha de inicio','date','f-fecha','',todayISO())+fG('% Comisión Rosa (0 si no aplica)','number','f-comision','0','0')+'</div><div style="margin-top:20px;"><button class="primary" id="f-submit">Registrar préstamo</button></div><div id="f-msg" style="display:none;margin-top:12px;font-size:13px;color:var(--text-success);">✓ Préstamo registrado correctamente.</div></div>';
+  document.getElementById('f-submit').onclick=async function(){
+    var nombre=document.getElementById('f-nombre').value.trim(),monto=parseFloat(document.getElementById('f-monto').value),tasa=parseFloat(document.getElementById('f-tasa').value),fecha=document.getElementById('f-fecha').value,com=parseFloat(document.getElementById('f-comision').value)||0;
+    if(!nombre||!monto||!tasa||!fecha){alert('Completa todos los campos obligatorios.');return;}
+    loans.push({id:uid(),nombre:nombre,monto:monto,tasa:tasa/100,comisionPct:com,fechaInicio:fecha,abonosCapital:[],historialCapital:[{fecha:fecha,saldo:monto}],estado:'activo',pagos:[]});
+    await addInteresEfectivo(-monto);
+    await saveLoans();
+    document.getElementById('f-msg').style.display='block';
+    setTimeout(function(){document.getElementById('f-msg').style.display='none';},2500);
+    document.getElementById('f-nombre').value='';document.getElementById('f-monto').value='';document.getElementById('f-tasa').value='';document.getElementById('f-comision').value='0';
+    renderDashboard();renderPrestamos();
+  };
+}
+
+function renderNuevoCuota(){
+  document.getElementById('view-nuevocuota').innerHTML='<div class="card" style="max-width:560px;"><div class="section-title">Registrar nuevo préstamo en cuotas</div><div class="form-grid">'+fG('Nombre del prestatario','text','fc-nombre','Ej. Tío de Jhiosmar')+fG('Capital total (S/)','number','fc-monto','2500')+fG('Número de cuotas','number','fc-numcuotas','3')+fG('Tasa mensual sobre saldo (%)','number','fc-tasa','15')+fG('Fecha de inicio','date','fc-fecha','',todayISO())+'</div><div style="margin-top:20px;"><button class="primary" id="fc-submit">Registrar préstamo en cuotas</button></div><div id="fc-msg" style="display:none;margin-top:12px;font-size:13px;color:var(--text-success);">✓ Préstamo en cuotas registrado correctamente.</div></div>';
+  document.getElementById('fc-submit').onclick=async function(){
+    var nombre=document.getElementById('fc-nombre').value.trim(),monto=parseFloat(document.getElementById('fc-monto').value),nc=parseInt(document.getElementById('fc-numcuotas').value),tasa=parseFloat(document.getElementById('fc-tasa').value)||0,fecha=document.getElementById('fc-fecha').value;
+    if(!nombre||!monto||!nc||!fecha){alert('Completa todos los campos obligatorios.');return;}
+    cuotaLoans.push({id:uid(),nombre:nombre,monto:monto,numCuotas:nc,tasa:tasa/100,fechaInicio:fecha,estado:'activo',pagos:[]});
+    await addInteresEfectivo(-monto);
+    await saveCuotaLoans();
+    document.getElementById('fc-msg').style.display='block';
+    setTimeout(function(){document.getElementById('fc-msg').style.display='none';},2500);
+    document.getElementById('fc-nombre').value='';document.getElementById('fc-monto').value='';document.getElementById('fc-numcuotas').value='';document.getElementById('fc-tasa').value='';
+    renderDashboard();renderCuotas();
+  };
+}
+
+// ============================================================
+// TABS & REFRESH
+// ============================================================
+function setActiveTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===tab);});
+  document.querySelectorAll('.view').forEach(function(v){v.classList.toggle('active',v.id==='view-'+tab);});
+}
+document.querySelectorAll('.tab-btn').forEach(function(btn){
+  btn.onclick=function(){var t=btn.getAttribute('data-tab');setActiveTab(t);renderTab(t);};
+});
+
+// ============================================================
+// HISTORIAL
+// ============================================================
+var _histState = {selYear:null, selMode:'mensual', selMes:null, filtroTexto:'', filtroAno:'', ds:'ambos'};
+
+function _renderHistTabla(){
+  // Solo re-renderiza la tabla sin tocar el gráfico ni el estado del input
+  var el=document.getElementById('hist-tabla-wrap');
+  if(!el) return;
+  var ftxt=_histState.filtroTexto.toLowerCase();
+  var fano=_histState.filtroAno;
+  var histFiltrado=historialPrestamos.slice().sort(function(a,b){return (a.fechaInicio||'')<(b.fechaInicio||'')?-1:1;}).filter(function(h){
+    if(ftxt&&!h.nombre.toLowerCase().includes(ftxt)) return false;
+    if(fano&&(h.fechaInicio||'').slice(0,4)!==fano) return false;
+    return true;
+  });
+  var html='';
+  if(histFiltrado.length===0){html='<p style="color:var(--text-secondary);font-size:13px;">Sin resultados.</p>';}
+  else{
+    html='<div style="overflow-x:auto;"><table><thead><tr><th>Nombre</th><th>Inicio</th><th>Cierre</th><th style="text-align:center;">Meses</th><th>Capital</th><th style="text-align:center;">Tasa</th><th>Int. neto</th><th>Comisión</th></tr></thead><tbody>';
+    histFiltrado.forEach(function(h){
+      var mv=h.meses&&h.meses>0?Math.round(h.meses):'-';
+      var tv=h.tasa&&h.tasa>0?((h.tasa*100).toFixed(0)+'%'):'-';
+      html+='<tr><td>'+h.nombre+'</td><td>'+fmtDate(h.fechaInicio)+'</td><td>'+fmtDate(h.fechaCierre)+'</td><td style="text-align:center;">'+mv+'</td><td>'+fmtMoney(h.montoInicial)+'</td><td style="text-align:center;">'+tv+'</td><td style="color:var(--text-success);">'+fmtMoney(h.intTotalGenerado)+'</td><td>'+fmtMoney(h.comisionTotal)+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  el.innerHTML=html;
+}
+
+function renderHistorial(){
+  var el=document.getElementById('view-historial');
+  if(!el) return;
+
+  var allPayments=[];
+  loans.forEach(function(loan){
+    buildSchedule(loan).forEach(function(s){
+      if(s.pagado&&s.fechaPago) allPayments.push({fecha:s.fechaPago,nombre:loan.nombre,intReal:s.interesReal,intRosa:s.comision,intTotal:s.interesTotal});
+    });
+  });
+  historialPrestamos.forEach(function(h){
+    if(h.pagos&&h.pagos.length>0){
+      h.pagos.forEach(function(p){
+        if(p.fecha&&p.intReal>0) allPayments.push({fecha:p.fecha,nombre:h.nombre,intReal:p.intReal,intRosa:p.intRosa||0,intTotal:p.intTotal||p.intReal});
+      });
+    } else if(h.intTotalGenerado>0&&h.fechaCierre){
+      allPayments.push({fecha:h.fechaCierre,nombre:h.nombre,intReal:h.intTotalGenerado,intRosa:h.comisionTotal||0,intTotal:h.intTotalGenerado+(h.comisionTotal||0)});
+    }
+  });
+  allPayments.sort(function(a,b){return a.fecha<b.fecha?-1:1;});
+
+  var years=[...new Set(allPayments.map(function(p){return p.fecha.slice(0,4);}))].sort();
+  if(!_histState.selYear) _histState.selYear=years.includes(new Date().getFullYear().toString())?new Date().getFullYear().toString():(years[years.length-1]||'2026');
+
+  var isTodos=_histState.selYear==='TODOS';
+  var filtered=isTodos?allPayments:allPayments.filter(function(p){return p.fecha.startsWith(_histState.selYear);});
+  var meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  var grouped={};
+  if(isTodos){
+    years.forEach(function(y){grouped[y]={label:y,intReal:0,intRosa:0,intTotal:0,n:0,payments:[]};});
+    filtered.forEach(function(p){var k=p.fecha.slice(0,4);if(grouped[k]){grouped[k].intReal+=p.intReal;grouped[k].intRosa+=p.intRosa;grouped[k].intTotal+=p.intTotal;grouped[k].n++;grouped[k].payments.push(p);}});
+  } else {
+    for(var m=1;m<=12;m++){var k=_histState.selYear+'-'+(m<10?'0'+m:m);grouped[k]={label:meses[m-1],intReal:0,intRosa:0,intTotal:0,n:0,payments:[]};}
+    filtered.forEach(function(p){var k=p.fecha.slice(0,7);if(grouped[k]){grouped[k].intReal+=p.intReal;grouped[k].intRosa+=p.intRosa;grouped[k].intTotal+=p.intTotal;grouped[k].n++;grouped[k].payments.push(p);}});
+  }
+  var gKeys=Object.keys(grouped);
+  var totalInt=filtered.reduce(function(a,p){return a+p.intReal;},0);
+  var totalRosa=filtered.reduce(function(a,p){return a+p.intRosa;},0);
+
+  function dsBtn(key,label,color){
+    var active=_histState.ds===key;
+    return '<button class="hist-ds" data-ds="'+key+'" style="padding:5px 14px;font-size:12px;border-radius:var(--radius);border:1.5px solid '+(active?color:'var(--border)')+';background:'+(active?color+'33':'transparent')+';color:'+(active?color:'var(--text-secondary)')+';cursor:pointer;font-weight:'+(active?'600':'400')+';">'+label+'</button>';
+  }
+  var yearBtns='<button class="hist-year" data-year="TODOS" style="padding:5px 12px;font-size:12px;margin-right:4px;border-radius:var(--radius-sm);border:1px solid '+(isTodos?'#8b5cf6':'var(--border)')+';background:'+(isTodos?'#8b5cf6':'transparent')+';color:'+(isTodos?'#fff':'var(--text-secondary)')+';cursor:pointer;">TODOS</button>';
+  yearBtns+=years.map(function(y){var a=y===_histState.selYear;return '<button class="hist-year" data-year="'+y+'" style="padding:5px 12px;font-size:12px;margin-right:4px;border-radius:var(--radius-sm);border:1px solid '+(a?'var(--accent)':'var(--border)')+';background:'+(a?'var(--accent)':'transparent')+';color:'+(a?'#fff':'var(--text-secondary)')+';cursor:pointer;">'+y+'</button>';}).join('');
+
+  var html='<div class="metric-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">';
+  html+=metricCard('Interés neto '+(isTodos?'total':_histState.selYear),fmtMoney(totalInt));
+  html+=metricCard('Comisión Rosa '+(isTodos?'total':_histState.selYear),fmtMoney(totalRosa));
+  html+=metricCard('Total bruto '+(isTodos?'total':_histState.selYear),fmtMoney(totalInt+totalRosa));
+  html+=metricCard('Cobros registrados',String(filtered.length));
+  html+='</div>';
+
+  html+='<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">';
+  html+='<span style="font-size:13px;font-weight:500;">Período:</span>'+yearBtns;
+  html+='<span style="margin-left:auto;display:flex;gap:6px;">';
+  ['mensual','acumulado'].forEach(function(m){var a=_histState.selMode===m;html+='<button class="hist-mode" data-mode="'+m+'" style="font-size:12px;padding:5px 12px;border-radius:var(--radius-sm);border:1px solid '+(a?'var(--accent)':'var(--border)')+';background:'+(a?'var(--accent)':'transparent')+';color:'+(a?'#fff':'var(--text-secondary)')+';cursor:pointer;">'+m.charAt(0).toUpperCase()+m.slice(1)+'</button>';});
+  html+='</span></div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">';
+  html+=dsBtn('interes','Solo interés neto','#1D9E75');
+  html+=dsBtn('comision','Solo comisión Rosa','#EF9F27');
+  html+=dsBtn('ambos','Interés neto + Comisión','#1D9E75');
+  html+=dsBtn('total','Total bruto','#378ADD');
+  html+='</div>';
+  html+='<p style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">💡 Clic en una barra para ver detalle del período</p>';
+  html+='<div style="position:relative;height:260px;margin-bottom:8px;"><canvas id="chartHistorial"></canvas></div>';
+  html+='<div class="legend" id="hist-legend"></div>';
+
+  if(_histState.selMes!==null&&grouped[_histState.selMes]){
+    var g=grouped[_histState.selMes];
+    html+='<div style="background:var(--bg);border:1px solid var(--accent);border-radius:var(--radius);padding:14px 18px;margin-bottom:12px;">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-weight:600;font-size:14px;">📊 '+g.label+(isTodos?'':' '+_histState.selYear)+'</span><button id="hist-clear-sel" style="font-size:12px;padding:3px 10px;">✕ Cerrar</button></div>';
+    html+='<table><thead><tr><th>Prestatario</th><th>Fecha pago</th><th>Interés neto</th><th>Comisión Rosa</th><th>Total</th></tr></thead><tbody>';
+    g.payments.forEach(function(p){html+='<tr><td>'+p.nombre+'</td><td>'+fmtDate(p.fecha)+'</td><td>'+fmtMoney(p.intReal)+'</td><td>'+fmtMoney(p.intRosa)+'</td><td>'+fmtMoney(p.intTotal)+'</td></tr>';});
+    html+='<tr style="font-weight:600;border-top:2px solid var(--border);"><td colspan="2">TOTAL</td><td>'+fmtMoney(g.intReal)+'</td><td>'+fmtMoney(g.intRosa)+'</td><td>'+fmtMoney(g.intTotal)+'</td></tr>';
+    html+='</tbody></table></div>';
+  }
+
+  html+='<div style="overflow-x:auto;margin-bottom:0;"><table><thead><tr><th>Período</th><th>Interés neto</th><th>Comisión Rosa</th><th>Total bruto</th><th>Cobros</th></tr></thead><tbody>';
+  gKeys.forEach(function(k){var g=grouped[k];if(g.intTotal>0) html+='<tr><td>'+g.label+(isTodos?'':' '+_histState.selYear)+'</td><td>'+fmtMoney(g.intReal)+'</td><td>'+fmtMoney(g.intRosa)+'</td><td>'+fmtMoney(g.intTotal)+'</td><td>'+g.n+'</td></tr>';});
+  html+='</tbody></table></div></div>';
+
+  // Tabla cerrados: filtros arriba, tabla en div separado
+  var anosHist=[...new Set(historialPrestamos.map(function(h){return (h.fechaInicio||'').slice(0,4);}))].filter(Boolean).sort();
+  html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;"><div class="section-title" style="margin:0;">Préstamos cerrados ('+historialPrestamos.length+')</div>';
+  html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+  html+='<input type="text" id="hft" placeholder="Buscar nombre..." value="'+_histState.filtroTexto+'" style="width:160px;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);" />';
+  html+='<select id="hfa" style="padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);"><option value="">Todos los años</option>';
+  anosHist.forEach(function(a){html+='<option value="'+a+'"'+(_histState.filtroAno===a?' selected':'')+'>'+a+'</option>';});
+  html+='</select>';
+  html+='<button id="btn-reseed-hist" title="Restaurar datos del historial" style="font-size:11px;padding:4px 10px;opacity:0.4;border:1px dashed var(--border);">⟳ Restaurar</button>';
+  html+='</div></div>';
+  html+='<div id="hist-tabla-wrap"></div></div>';
+
+  el.innerHTML=html;
+
+  // Poblar tabla sin re-renderizar el gráfico
+  _renderHistTabla();
+
+  // Bind: año/modo/ds → renderHistorial completo; texto → solo _renderHistTabla
+  el.querySelectorAll('.hist-year').forEach(function(b){b.onclick=function(){_histState.selYear=b.getAttribute('data-year');_histState.selMes=null;renderHistorial();};});
+  el.querySelectorAll('.hist-mode').forEach(function(b){b.onclick=function(){_histState.selMode=b.getAttribute('data-mode');renderHistorial();};});
+  el.querySelectorAll('.hist-ds').forEach(function(b){b.onclick=function(){_histState.ds=b.getAttribute('data-ds');renderHistorial();};});
+  var cs=document.getElementById('hist-clear-sel');
+  if(cs) cs.onclick=function(){_histState.selMes=null;renderHistorial();};
+  var hft=document.getElementById('hft');
+  if(hft){
+    hft.oninput=function(){_histState.filtroTexto=hft.value;_renderHistTabla();};
+    // Mantener foco si ya estaba escribiendo
+    if(_histState.filtroTexto) setTimeout(function(){var h=document.getElementById('hft');if(h){h.focus();h.setSelectionRange(h.value.length,h.value.length);}},10);
+  }
+  var hfa=document.getElementById('hfa');
+  if(hfa){hfa.onchange=function(){_histState.filtroAno=hfa.value;_renderHistTabla();};}
+  var btnReseed=document.getElementById('btn-reseed-hist');
+  if(btnReseed){
+    btnReseed.onclick=function(){
+      showConfirmModal('¿Restaurar datos del historial desde el seed original? Esto sobreescribirá los datos actuales en Supabase.', async function(){
+        setSyncStatus('syncing');
+        try{
+          historialPrestamos = seedHistorial();
+          await saveHistorial();
+          renderHistorial();
+        }catch(e){ setSyncStatus('error'); console.error('Error reseed historial',e); }
+      }, 'Sí, restaurar', 'primary', 'Confirmar restauración');
+    };
+  }
+
+  // Gráfico
+  var dataIR=gKeys.map(function(k){return Math.round(grouped[k].intReal);});
+  var dataCom=gKeys.map(function(k){return Math.round(grouped[k].intRosa);});
+  var dataTotal=gKeys.map(function(k){return Math.round(grouped[k].intReal+grouped[k].intRosa);});
+  if(_histState.selMode==='acumulado'){
+    var a1=0,a2=0,a3=0;
+    dataIR=dataIR.map(function(v){a1+=v;return a1;});
+    dataCom=dataCom.map(function(v){a2+=v;return a2;});
+    dataTotal=dataTotal.map(function(v){a3+=v;return a3;});
+  }
+  var datasets=[];
+  var legendHtml='';
+  if(_histState.ds==='interes'){
+    datasets=[{label:'Interés neto',data:dataIR,backgroundColor:'#1D9E75',borderRadius:3}];
+    legendHtml='<div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div>Interés neto</div>';
+  } else if(_histState.ds==='comision'){
+    datasets=[{label:'Comisión Rosa',data:dataCom,backgroundColor:'#EF9F27',borderRadius:3}];
+    legendHtml='<div class="legend-item"><div class="legend-dot" style="background:#EF9F27;"></div>Comisión Rosa</div>';
+  } else if(_histState.ds==='total'){
+    datasets=[{label:'Total bruto',data:dataTotal,backgroundColor:'#378ADD',borderRadius:3}];
+    legendHtml='<div class="legend-item"><div class="legend-dot" style="background:#378ADD;"></div>Total bruto</div>';
+  } else {
+    datasets=[{label:'Interés neto',data:dataIR,backgroundColor:'#1D9E75',borderRadius:3},{label:'Comisión Rosa',data:dataCom,backgroundColor:'#EF9F27',borderRadius:3}];
+    legendHtml='<div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div>Interés neto</div><div class="legend-item"><div class="legend-dot" style="background:#EF9F27;"></div>Comisión Rosa</div>';
+  }
+  document.getElementById('hist-legend').innerHTML=legendHtml;
+  var stacked=_histState.ds==='ambos';
+  destroyChart('historial');
+  var ctx=document.getElementById('chartHistorial');
+  if(ctx){
+    charts.historial=new Chart(ctx,{type:'bar',data:{labels:gKeys.map(function(k){return grouped[k].label;}),datasets:datasets},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:16}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.dataset.label+': S/ '+c.raw.toLocaleString('es-PE');}}}},
+        scales:{x:{stacked:stacked,ticks:{color:'#8b92a9'}},y:{stacked:stacked,beginAtZero:true,ticks:{color:'#8b92a9'}}},
+        onClick:function(evt,els){if(els&&els.length>0){var k=gKeys[els[0].index];_histState.selMes=(_histState.selMes===k?null:k);renderHistorial();}}
+      },plugins:[valueLabelPlugin]});
+  }
+}
+
+
+// ============================================================
+// ANÁLISIS — Rendimiento + Pronóstico
+// ============================================================
+function renderAnalisis(){
+  var el=document.getElementById('view-analisis');
+  if(!el) return;
+  var seccion=el._seccion||'rendimiento';
+  el._seccion=seccion;
+
+  // ── Datos de rendimiento histórico ──
+  // Agrupar todos los pagos de interés por mes (activos + historial)
+  var pagosXMes={};
+  function addPago(fecha,intReal,intRosa,nombre){
+    if(!fecha||fecha==='-') return;
+    var mes=fecha.slice(0,7); // YYYY-MM
+    if(!pagosXMes[mes]) pagosXMes[mes]={intReal:0,intRosa:0,total:0,detalle:[]};
+    pagosXMes[mes].intReal+=intReal;
+    pagosXMes[mes].intRosa+=intRosa;
+    pagosXMes[mes].total+=intReal+intRosa;
+    pagosXMes[mes].detalle.push({nombre:nombre,intReal:intReal,intRosa:intRosa});
+  }
+  // Préstamos activos — cuotas pagadas
+  loans.forEach(function(l){
+    buildSchedule(l).filter(function(s){return s.pagado&&s.fechaPago;}).forEach(function(s){
+      addPago(s.fechaPago,s.interesReal,s.comision,l.nombre);
+    });
+  });
+  // Cuotas — pagadas
+  cuotaLoans.forEach(function(l){
+    buildCuotaSchedule(l).filter(function(s){return s.pagado&&s.fechaPago;}).forEach(function(s){
+      addPago(s.fechaPago,s.interes,0,l.nombre);
+    });
+  });
+  // Historial cerrado
+  historialPrestamos.forEach(function(h){
+    if(h.pagos&&h.pagos.length>0){
+      h.pagos.forEach(function(p){if(p.fecha&&p.intReal>0) addPago(p.fecha,p.intReal,p.intRosa||0,h.nombre);});
+    } else if(h.intTotalGenerado>0){
+      // Si tiene meses definidos, distribuir mes a mes desde fechaInicio
+      if(h.meses&&h.meses>0&&h.fechaInicio){
+        var meses=Math.round(h.meses);
+        var intXMes=Math.round((h.intTotalGenerado-(h.comisionTotal||0))/meses);
+        var comXMes=Math.round((h.comisionTotal||0)/meses);
+        for(var m=1;m<=meses;m++){
+          var fMes=addMonths(h.fechaInicio,m);
+          if(fMes) addPago(fMes,intXMes,comXMes,h.nombre);
+        }
+      } else if(h.fechaCierre){
+        addPago(h.fechaCierre,h.intTotalGenerado-(h.comisionTotal||0),h.comisionTotal||0,h.nombre);
+      }
+    }
+  });
+  var mesesOrden=Object.keys(pagosXMes).sort();
+
+  // ── Pronóstico ──
+  // Para cada préstamo activo, proyectar cuotas futuras no pagadas
+  var pronostico={}; // mes -> {intReal, intRosa, capital}
+  var hoy=todayISO();
+  function addPronostico(fecha,intReal,intRosa,capital,nombre){
+    if(!fecha) return;
+    // Incluir si: mes actual o futuro, O si es pasado pero la cuota no fue pagada (mora)
+    var mes=fecha.slice(0,7);
+    if(!pronostico[mes]) pronostico[mes]={intReal:0,intRosa:0,capital:0,detalle:[],vencida:false};
+    pronostico[mes].intReal+=intReal;
+    pronostico[mes].intRosa+=intRosa;
+    pronostico[mes].capital+=capital;
+    if(mes<hoy.slice(0,7)) pronostico[mes].vencida=true;
+    pronostico[mes].detalle.push({nombre:nombre,intReal:intReal,capital:capital,fecha:fecha,vencida:mes<hoy.slice(0,7)});
+  }
+  loans.filter(function(l){return l.estado!=='pagado';}).forEach(function(l){
+    buildSchedule(l).filter(function(s){return !s.pagado;}).forEach(function(s){
+      addPronostico(s.fechaVencimiento,s.interesReal,s.comision,s.saldo,l.nombre);
+    });
+  });
+  cuotaLoans.filter(function(l){return l.estado!=='pagado';}).forEach(function(l){
+    buildCuotaSchedule(l).filter(function(s){return !s.pagado;}).forEach(function(s){
+      addPronostico(s.fechaVencimiento,s.interes,0,s.capital,l.nombre+' (cuotas)');
+    });
+  });
+  var mesActual=hoy.slice(0,7);
+  // Incluir meses pasados si tienen cuotas vencidas pendientes, más los próximos 12 meses
+  var mesesPron=Object.keys(pronostico).sort().filter(function(m){
+    return m>=mesActual || pronostico[m].vencida;
+  }).slice(0,12);
+
+  // ── Métricas globales ──
+  var totalIntReal=mesesOrden.reduce(function(a,m){return a+pagosXMes[m].intReal;},0);
+  var totalIntRosa=mesesOrden.reduce(function(a,m){return a+pagosXMes[m].intRosa;},0);
+  var mejorMes=mesesOrden.reduce(function(best,m){return pagosXMes[m].intReal>=(pagosXMes[best]||{intReal:0}).intReal?m:best;},mesesOrden[0]||'');
+  var promedioMensual=mesesOrden.length>0?Math.round(totalIntReal/mesesOrden.length):0;
+  var totalPronInt=mesesPron.reduce(function(a,m){return a+pronostico[m].intReal;},0);
+  var totalPronCap=mesesPron.reduce(function(a,m){return a+pronostico[m].capital;},0);
+
+  function fmtMes(m){ if(!m) return '-'; var p=m.split('-'); var meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return meses[parseInt(p[1])-1]+' '+p[0]; }
+
+  // ── HTML ──
+  var html='<div style="display:flex;gap:8px;margin-bottom:20px;">';
+  html+='<button class="analisis-sec" data-sec="rendimiento" style="padding:8px 20px;font-size:14px;font-weight:500;border-radius:var(--radius);border:2px solid '+(seccion==='rendimiento'?'var(--accent)':'var(--border)')+';background:'+(seccion==='rendimiento'?'var(--accent)':'var(--bg-secondary)')+';color:#fff;cursor:pointer;">📈 Rendimiento</button>';
+  html+='<button class="analisis-sec" data-sec="pronostico" style="padding:8px 20px;font-size:14px;font-weight:500;border-radius:var(--radius);border:2px solid '+(seccion==='pronostico'?'var(--accent)':'var(--border)')+';background:'+(seccion==='pronostico'?'var(--accent)':'var(--bg-secondary)')+';color:#fff;cursor:pointer;">🔮 Pronóstico</button>';
+  html+='</div>';
+
+  if(seccion==='rendimiento'){
+    if(mesesOrden.length===0){ html+='<p style="color:var(--text-secondary);">Aún no hay pagos registrados.</p>'; el.innerHTML=html; return; }
+    html+='<div class="metric-grid">';
+    html+=metricCard('Interés neto total cobrado',fmtMoney(totalIntReal));
+    html+=metricCard('Comisión Rosa total',fmtMoney(totalIntRosa));
+    html+=metricCard('Promedio mensual',fmtMoney(promedioMensual));
+    html+=metricCard('Mejor mes',fmtMes(mejorMes)+' — '+fmtMoney(mejorMes?pagosXMes[mejorMes].intReal:0));
+    html+='</div>';
+    html+='<div class="card"><div class="section-title">Interés neto cobrado por mes</div><div class="chart-wrap" style="height:260px;"><canvas id="chartRendMes"></canvas></div></div>';
+    // Tabla por prestatario
+    var porPrestatario={};
+    mesesOrden.forEach(function(m){
+      pagosXMes[m].detalle.forEach(function(d){
+        if(!porPrestatario[d.nombre]) porPrestatario[d.nombre]={intReal:0,intRosa:0,meses:0};
+        porPrestatario[d.nombre].intReal+=d.intReal;
+        porPrestatario[d.nombre].intRosa+=d.intRosa;
+        porPrestatario[d.nombre].meses++;
+      });
+    });
+    var ppRows=Object.keys(porPrestatario).sort(function(a,b){return porPrestatario[b].intReal-porPrestatario[a].intReal;});
+    html+='<div class="card"><div class="section-title">Rendimiento por prestatario</div><div style="overflow-x:auto;"><table><thead><tr><th>Prestatario</th><th>Interés neto cobrado</th><th>Comisión Rosa</th><th>Total generado</th><th>% del total</th></tr></thead><tbody>';
+    ppRows.forEach(function(n){
+      var r=porPrestatario[n];
+      var pct=totalIntReal>0?((r.intReal/totalIntReal)*100).toFixed(1):'0.0';
+      html+='<tr><td><b>'+n+'</b></td><td style="color:var(--text-success);">'+fmtMoney(r.intReal)+'</td><td style="color:#EF9F27;">'+fmtMoney(r.intRosa)+'</td><td>'+fmtMoney(r.intReal+r.intRosa)+'</td><td><div style="display:flex;align-items:center;gap:6px;"><div style="background:var(--accent);height:6px;border-radius:3px;width:'+Math.round(parseFloat(pct))+'px;min-width:2px;"></div>'+pct+'%</div></td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+
+  } else {
+    if(mesesPron.length===0){ html+='<p style="color:var(--text-secondary);">No hay cuotas futuras proyectadas.</p>'; el.innerHTML=html; return; }
+    // proxMes = primer mes futuro (no vencido), para las métricas
+    var proxMes=mesesPron.find(function(m){return m>mesActual;})||mesesPron.find(function(m){return m>=mesActual;})||mesesPron[0];
+    var mesPronFuturos=mesesPron.filter(function(m){return m>mesActual;});
+    html+='<div class="metric-grid">';
+    html+=metricCard('Interés esperado próx. mes ('+fmtMes(proxMes)+')',fmtMoney(pronostico[proxMes]?pronostico[proxMes].intReal:0));
+    html+=metricCard('Interés esperado próx. 3 meses',fmtMoney(mesPronFuturos.slice(0,3).reduce(function(a,m){return a+pronostico[m].intReal;},0)));
+    html+=metricCard('Interés esperado próx. 12 meses',fmtMoney(mesPronFuturos.reduce(function(a,m){return a+pronostico[m].intReal;},0)));
+    html+=metricCard('Capital a recuperar (12m)',fmtMoney(mesPronFuturos.reduce(function(a,m){return a+pronostico[m].capital;},0)));
+    html+='</div>';
+    html+='<div class="card"><div class="section-title">Proyección mensual de ingresos</div><div class="chart-wrap" style="height:260px;"><canvas id="chartPronMes"></canvas></div></div>';
+    html+='<div class="card"><div class="section-title">Detalle mes a mes</div><div style="overflow-x:auto;"><table><thead><tr><th>Mes</th><th>Interés neto esperado</th><th>Capital a recuperar</th><th>Total a recibir</th></tr></thead><tbody>';
+    mesesPron.forEach(function(m){
+      var r=pronostico[m];
+      var esProx=m===proxMes;
+      var esVencido=m<mesActual;
+      html+='<tr class="pron-row" data-mes="'+m+'" style="cursor:pointer;'+(esProx?'background:rgba(55,138,221,0.08);':esVencido?'background:rgba(239,68,68,0.06);':'')+'">'+
+        '<td><b>'+(esProx?'→ ':esVencido?'⚠ ':'')+fmtMes(m)+'</b>'+(esVencido?' <span style="font-size:10px;color:var(--text-danger);">mora pendiente</span>':'')+'</td>'+
+        '<td style="color:var(--text-success);">'+fmtMoney(r.intReal)+'</td>'+
+        '<td>'+fmtMoney(r.capital)+'</td>'+
+        '<td style="font-weight:600;">'+fmtMoney(r.intReal+r.capital)+'</td></tr>';
+      html+='<tr id="det-'+m+'" style="display:none;"><td colspan="4" style="padding:0;"></td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+
+  el.innerHTML=html;
+  el.querySelectorAll('.analisis-sec').forEach(function(b){
+    b.onclick=function(){el._seccion=b.getAttribute('data-sec');renderAnalisis();};
+  });
+  if(seccion==='pronostico'){
+    el.querySelectorAll('.pron-row').forEach(function(row){
+      row.onclick=function(){
+        var m=row.getAttribute('data-mes');
+        var detRow=document.getElementById('det-'+m);
+        if(!detRow) return;
+        if(detRow.style.display!=='none'){detRow.style.display='none';return;}
+        var r=pronostico[m];
+        var inner='<td colspan="4" style="padding:8px 12px;background:var(--bg);"><div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;font-weight:600;">Préstamos incluidos en '+fmtMes(m)+':</div>';
+        inner+='<table style="width:100%;font-size:12px;"><thead><tr><th style="text-align:left;padding:4px 8px;">Prestatario</th><th style="padding:4px 8px;">Vence</th><th style="padding:4px 8px;">Interés</th><th style="padding:4px 8px;">Capital</th></tr></thead><tbody>';
+        r.detalle.forEach(function(d){
+          inner+='<tr style="border-top:1px solid var(--border);">'+
+            '<td style="padding:4px 8px;font-weight:500;">'+d.nombre+(d.vencida?' <span style="color:var(--text-danger);font-size:10px;">⚠ vencida</span>':'')+'</td>'+
+            '<td style="padding:4px 8px;color:'+(d.vencida?'var(--text-danger)':'var(--text-secondary)')+';">'+fmtDate(d.fecha)+'</td>'+
+            '<td style="padding:4px 8px;color:var(--text-success);">'+fmtMoney(d.intReal)+'</td>'+
+            '<td style="padding:4px 8px;">'+fmtMoney(d.capital)+'</td></tr>';
+        });
+        inner+='</tbody></table></td>';
+        detRow.innerHTML=inner;
+        detRow.style.display='';
+      };
+    });
+  }
+
+  // Charts
+  setTimeout(function(){
+    if(seccion==='rendimiento'){
+      destroyChart('rendMes');
+      var ctx=document.getElementById('chartRendMes');
+      if(!ctx) return;
+      charts.rendMes=new Chart(ctx,{type:'bar',data:{labels:mesesOrden.map(fmtMes),datasets:[{label:'Interés neto',data:mesesOrden.map(function(m){return Math.round(pagosXMes[m].intReal);}),backgroundColor:'#1D9E75'},{label:'Comisión Rosa',data:mesesOrden.map(function(m){return Math.round(pagosXMes[m].intRosa);}),backgroundColor:'#EF9F27'}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{labels:{color:'#8b92a9'}}},scales:{x:{stacked:true,ticks:{color:'#8b92a9'}},y:{stacked:true,beginAtZero:true,ticks:{color:'#8b92a9'}}}}});
+    } else {
+      destroyChart('pronMes');
+      var ctx2=document.getElementById('chartPronMes');
+      if(!ctx2) return;
+      charts.pronMes=new Chart(ctx2,{type:'bar',data:{labels:mesesPron.map(fmtMes),datasets:[{label:'Interés neto',data:mesesPron.map(function(m){return Math.round(pronostico[m].intReal);}),backgroundColor:'#378ADD'},{label:'Capital',data:mesesPron.map(function(m){return Math.round(pronostico[m].capital);}),backgroundColor:'rgba(55,138,221,0.25)'}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{labels:{color:'#8b92a9'}},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+fmtMoney(c.raw);}}}},scales:{x:{stacked:true,ticks:{color:'#8b92a9'}},y:{stacked:true,beginAtZero:true,ticks:{color:'#8b92a9'}}}}});
+    }
+  },50);
+}
+
+// ============================================================
+// PATRIMONIO
+// ============================================================
+function renderPatrimonio(){
+  var el=document.getElementById('view-patrimonio');
+  if(!el) return;
+
+  var capPrest=loans.filter(function(l){return l.estado!=='pagado';}).reduce(function(a,l){return a+saldoActualDe(l);},0);
+  var capCuotas=cuotaLoans.filter(function(l){return l.estado!=='pagado';}).reduce(function(a,l){var sc=buildCuotaSchedule(l),p=sc.find(function(s){return !s.pagado;});return a+(p?p.saldoAntes:0);},0);
+  var totalPrest=capPrest+capCuotas;
+
+  var bolsas=patrimonioBolsas||[];
+  var totalBolsas=bolsas.reduce(function(a,b){return a+b.monto;},0);
+  var totalPatrimonio=totalPrest+Math.max(0,totalBolsas);
+
+  var iconos={efectivo:'💵',inversion:'📈',otro:'🔧'};
+  var colores={efectivo:'#378ADD',inversion:'#1D9E75',otro:'#EF9F27'};
+
+  var html='<div class="metric-grid">';
+  html+=metricCard('Patrimonio total G&A',fmtMoney(totalPatrimonio));
+  html+=metricCard('Capital en préstamos',fmtMoney(totalPrest));
+  html+=metricCard('Efectivo e inversiones',fmtMoney(bolsas.filter(function(b){return b.monto>0;}).reduce(function(a,b){return a+b.monto;},0)));
+  html+=metricCard('Deudas internas',fmtMoney(Math.abs(bolsas.filter(function(b){return b.monto<0;}).reduce(function(a,b){return a+b.monto;},0))));
+  html+='</div>';
+
+  html+='<div class="card"><div class="section-title">Distribución del capital</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;"><div style="position:relative;height:280px;"><canvas id="chartPatrimonio"></canvas></div><div>';
+
+  // Bolsa préstamos (fija)
+  var pct=totalPatrimonio>0?Math.round(totalPrest/totalPatrimonio*100):0;
+  html+='<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><span style="font-size:15px;margin-right:8px;">🤝</span><span style="font-weight:500;">Préstamos activos</span><div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">'+pct+'% del patrimonio</div></div><div style="font-size:17px;font-weight:600;">'+fmtMoney(totalPrest)+'</div></div>';
+
+  bolsas.forEach(function(b){
+    var bpct=totalPatrimonio>0&&b.monto>0?Math.round(b.monto/totalPatrimonio*100):0;
+    html+='<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">';
+    html+='<div><span style="font-size:15px;margin-right:8px;">'+(iconos[b.tipo]||'💼')+'</span><span style="font-weight:500;">'+b.nombre+'</span>';
+    if(b.monto>0) html+='<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">'+bpct+'% del patrimonio</div>';
+    if(b.notas) html+='<div style="font-size:11px;color:var(--text-secondary);">'+b.notas+'</div>';
+    html+='</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:17px;font-weight:600;color:'+(b.monto<0?'var(--text-danger)':'')+'">'+fmtMoney(b.monto)+'</span>';
+    html+='<button class="edit-bolsa-btn" data-id="'+b.id+'" style="font-size:11px;padding:3px 8px;">Editar</button>';
+    html+='<button class="del-bolsa-btn" data-id="'+b.id+'" style="font-size:11px;padding:3px 8px;color:var(--text-danger);border-color:#fca5a5;background:var(--bg-danger);">✕</button>';
+    html+='</div></div>';
+  });
+
+  html+='<div style="padding-top:12px;"><button id="add-bolsa-btn" style="font-size:13px;padding:6px 14px;">+ Agregar bolsa</button></div>';
+  html+='</div></div></div>';
+
+  el.innerHTML=html;
+
+  // Chart dona
+  var pieLabels=['Préstamos activos'].concat(bolsas.filter(function(b){return b.monto>0;}).map(function(b){return b.nombre;}));
+  var pieData=[totalPrest].concat(bolsas.filter(function(b){return b.monto>0;}).map(function(b){return b.monto;}));
+  var pieColors=['#3B5B92','#4FA36C','#EF9F27','#8b5cf6','#f43f5e','#06b6d4'];
+  destroyChart('patrimonio');
+  var ctx=document.getElementById('chartPatrimonio');
+  if(ctx){charts.patrimonio=new Chart(ctx,{type:'doughnut',data:{labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors,borderWidth:2,borderColor:'#1e2130'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{color:'#e8eaf0',font:{size:12},padding:12}},tooltip:{callbacks:{label:function(c){var tot=c.dataset.data.reduce(function(a,b){return a+b;},0);var pct=tot>0?Math.round(c.raw/tot*100):0;return c.label+': '+fmtMoney(c.raw)+' ('+pct+'%)';}}}},},plugins:[{id:'pctLabel',afterDatasetsDraw:function(chart){var ctx2=chart.ctx,ds=chart.data.datasets[0],meta=chart.getDatasetMeta(0);var total=ds.data.reduce(function(a,b){return a+b;},0);meta.data.forEach(function(arc,i){if(!ds.data[i]||total===0)return;var pct=Math.round(ds.data[i]/total*100);if(pct<5)return;var angle=(arc.startAngle+arc.endAngle)/2,r=(arc.innerRadius+arc.outerRadius)/2;var x=arc.x+Math.cos(angle)*r,y=arc.y+Math.sin(angle)*r;ctx2.save();ctx2.fillStyle='#fff';ctx2.font='bold 12px sans-serif';ctx2.textAlign='center';ctx2.textBaseline='middle';ctx2.fillText(pct+'%',x,y);ctx2.restore();});}}]});}
+
+  function openBolsaModal(b){
+    var box=document.getElementById('modal-box');
+    var isNew=!b;
+    b=b||{id:'bol_'+Date.now(),nombre:'',tipo:'efectivo',monto:0,fecha:todayISO(),notas:''};
+    box.innerHTML='<div class="modal-title">'+(isNew?'Nueva bolsa de capital':'Editar bolsa')+'</div><div class="modal-body">'+
+      '<div class="form-group"><label>Nombre</label><input type="text" id="eb-n" value="'+b.nombre+'" placeholder="Ej. Inversión en oro" /></div>'+
+      '<div class="form-group"><label>Monto actual (S/) — negativo para deudas/salidas</label><input type="number" id="eb-m" value="'+b.monto+'" /></div>'+
+      '<div class="form-group"><label>Tipo</label><select id="eb-t" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;background:var(--bg);color:var(--text);width:100%;"><option value="efectivo"'+(b.tipo==='efectivo'?' selected':'')+'>💵 Efectivo / Cuenta</option><option value="inversion"'+(b.tipo==='inversion'?' selected':'')+'>📈 Inversión</option><option value="otro"'+(b.tipo==='otro'?' selected':'')+'>🔧 Otro / Salida de caja</option></select></div>'+
+      '<div class="form-group"><label>Notas</label><input type="text" id="eb-no" value="'+b.notas+'" placeholder="Descripción breve" /></div>'+
+      '</div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">'+(isNew?'Agregar':'Guardar')+'</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('mc').onclick=closeModal;
+    document.getElementById('mok').onclick=async function(){
+      var n=document.getElementById('eb-n').value.trim();
+      if(!n)return;
+      b.nombre=n; b.monto=parseFloat(document.getElementById('eb-m').value)||0;
+      b.tipo=document.getElementById('eb-t').value; b.notas=document.getElementById('eb-no').value; b.fecha=todayISO();
+      if(isNew) patrimonioBolsas.push(b);
+      else{ var idx=patrimonioBolsas.findIndex(function(x){return x.id===b.id;}); if(idx>=0) patrimonioBolsas[idx]=b; }
+      closeModal(); await savePatrimonio(); renderPatrimonio();
+    };
+  }
+
+  el.querySelectorAll('.edit-bolsa-btn').forEach(function(btn){btn.onclick=function(){var b=patrimonioBolsas.find(function(x){return x.id===btn.getAttribute('data-id');});openBolsaModal(b);};});
+  el.querySelectorAll('.del-bolsa-btn').forEach(function(btn){
+    btn.onclick=function(){
+      var bid=btn.getAttribute('data-id');
+      var b=patrimonioBolsas.find(function(x){return x.id===bid;});
+      showConfirmModal('¿Eliminar la bolsa <b>'+(b?b.nombre:'')+'</b>? Esta acción no se puede deshacer.',async function(){
+        patrimonioBolsas=patrimonioBolsas.filter(function(x){return x.id!==bid;});
+        await savePatrimonio(); renderPatrimonio();
+      });
+    };
+  });
+  document.getElementById('add-bolsa-btn').onclick=function(){openBolsaModal(null);};
+}
+
+
+// ============================================================
+// CAJA INTERNA
+// ============================================================
+function renderCajaInterna(){
+  var el=document.getElementById('view-caja');
+  if(!el) return;
+
+  var persona=el._persona||'andrea';
+  el._persona=persona;
+
+  var data=cajaInterna[persona];
+  var totalJunta=(data.saldo_junta||0)+(data.saldo_inicial_junta||0);
+  var totalIntereses=(data.saldo_intereses||0)+(data.saldo_inicial_intereses||0);
+  var totalDeuda=totalJunta+totalIntereses;
+
+  var tabs=['andrea','gustavo'];
+  var tabBtns=tabs.map(function(p){
+    var active=p===persona;
+    return '<button class="caja-persona" data-persona="'+p+'" style="padding:8px 20px;font-size:14px;font-weight:500;'+(active?'background:var(--accent);color:#fff;border-color:var(--accent);':'')+'">'+p.charAt(0).toUpperCase()+p.slice(1)+'</button>';
+  }).join('');
+
+  var html='<div style="display:flex;gap:8px;margin-bottom:20px;">'+tabBtns+'</div>';
+
+  html+='<div class="metric-grid">';
+  html+=metricCard('Deuda total '+persona.charAt(0).toUpperCase()+persona.slice(1),fmtMoney(totalDeuda));
+  html+=metricCard('De junta',fmtMoney(totalJunta));
+  html+=metricCard('De intereses',fmtMoney(totalIntereses));
+  html+='</div>';
+
+  function movTable(movs, tipo){
+    var titulo=tipo==='junta'?'💰 Dinero de Junta':'📈 Dinero de Intereses';
+    var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><div class="section-title" style="margin:0;">'+titulo+'</div><button class="add-mov-btn" data-tipo="'+tipo+'" style="font-size:12px;padding:5px 12px;">+ Registrar movimiento</button></div>';
+    h+='<div style="overflow-x:auto;max-height:320px;overflow-y:auto;"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Motivo</th><th>Saldo</th><th></th></tr></thead><tbody>';
+    movs.forEach(function(m,i){
+      var tipo_mov=m.abono>0?'Abono':'Salida';
+      var color=m.abono>0?'var(--text-success)':'var(--text-danger)';
+      var monto=m.abono>0?m.abono:m.salida;
+      h+='<tr><td>'+fmtDate(m.fecha)+'</td><td style="color:'+color+';font-weight:500;">'+tipo_mov+'</td><td style="color:'+color+';">'+(m.abono>0?'+':'-')+fmtMoney(monto)+'</td><td style="color:var(--text-secondary);">'+m.motivo+'</td><td>'+fmtMoney(m.saldo)+'</td>';
+      h+='<td><button class="del-mov-btn" data-tipo="'+tipo+'" data-idx="'+i+'" style="font-size:11px;padding:2px 7px;color:var(--text-danger);border-color:#fca5a5;background:var(--bg-danger);">✕</button></td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table></div></div>';
+    return h;
+  }
+
+  html+=movTable(data.junta||[], 'junta');
+  html+=movTable(data.intereses||[], 'intereses');
+  el.innerHTML=html;
+
+  el.querySelectorAll('.caja-persona').forEach(function(b){b.onclick=function(){el._persona=b.getAttribute('data-persona');renderCajaInterna();};});
+
+  el.querySelectorAll('.add-mov-btn').forEach(function(btn){
+    btn.onclick=function(){
+      var tipo=btn.getAttribute('data-tipo');
+      var box=document.getElementById('modal-box');
+      box.innerHTML='<div class="modal-title">Registrar movimiento — '+tipo+'</div><div class="modal-body">'+
+        '<div class="form-group"><label>Tipo de movimiento</label><select id="mv-tipo" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;background:var(--bg);color:var(--text);width:100%;"><option value="salida">Salida (tomaron dinero de la caja)</option><option value="abono">Abono (devolvieron dinero)</option></select></div>'+
+        '<div class="form-group"><label>Monto (S/)</label><input type="number" id="mv-monto" placeholder="0.00" /></div>'+
+        '<div class="form-group"><label>Fecha</label><input type="date" id="mv-fecha" value="'+todayISO()+'" /></div>'+
+        '<div class="form-group"><label>Motivo</label><input type="text" id="mv-motivo" placeholder="Ej. gym, ropa, pago deuda..." /></div>'+
+        '</div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Registrar</button></div>';
+      document.getElementById('modal-overlay').classList.add('open');
+      document.getElementById('mc').onclick=closeModal;
+      document.getElementById('mok').onclick=async function(){
+        var tipoMov=document.getElementById('mv-tipo').value;
+        var monto=parseFloat(document.getElementById('mv-monto').value)||0;
+        var fecha=document.getElementById('mv-fecha').value;
+        var motivo=document.getElementById('mv-motivo').value;
+        if(!monto||!fecha)return;
+        var lista=cajaInterna[persona][tipo]||[];
+        var saldoAnterior=lista.length>0?lista[lista.length-1].saldo:0;
+        var nuevoSaldo=tipoMov==='salida'?saldoAnterior+monto:Math.max(0,saldoAnterior-monto);
+        lista.push({fecha:fecha,abono:tipoMov==='abono'?monto:0,salida:tipoMov==='salida'?monto:0,motivo:motivo,saldo:nuevoSaldo});
+        cajaInterna[persona][tipo]=lista;
+        if(tipo==='junta') cajaInterna[persona].saldo_junta=nuevoSaldo;
+        else cajaInterna[persona].saldo_intereses=nuevoSaldo;
+        // Conectar con bolsa Efectivo disponible
+        if(tipoMov==='abono') await addInteresEfectivo(monto);
+        else await addInteresEfectivo(-monto);
+        closeModal(); await saveCajaInterna(); renderCajaInterna(); renderPatrimonio();
+      };
+    };
+  });
+
+  el.querySelectorAll('.del-mov-btn').forEach(function(btn){
+    btn.onclick=function(){
+      var tipo=btn.getAttribute('data-tipo');
+      var idx=parseInt(btn.getAttribute('data-idx'));
+      showConfirmModal('¿Eliminar este movimiento? El saldo se recalculará.',async function(){
+        var lista=cajaInterna[persona][tipo]||[];
+        var mov=lista[idx];
+        // Revertir efecto en efectivo antes de eliminar
+        if(mov){ if(mov.abono>0) await addInteresEfectivo(-mov.abono); else if(mov.salida>0) await addInteresEfectivo(mov.salida); }
+        lista.splice(idx,1);
+        // Recalcular saldos
+        var saldo=0;
+        lista.forEach(function(m){saldo=m.abono>0?saldo-m.abono:saldo+m.salida;m.saldo=Math.max(0,saldo);});
+        cajaInterna[persona][tipo]=lista;
+        if(tipo==='junta') cajaInterna[persona].saldo_junta=lista.length>0?lista[lista.length-1].saldo:0;
+        else cajaInterna[persona].saldo_intereses=lista.length>0?lista[lista.length-1].saldo:0;
+        await saveCajaInterna(); await savePatrimonio(); renderCajaInterna(); renderPatrimonio();
+      });
+    };
+  });
+}
+
+function renderTab(t){
+  if(t==='dashboard')renderDashboard();
+  else if(t==='historial')renderHistorial();
+  else if(t==='analisis')renderAnalisis();
+  else if(t==='patrimonio')renderPatrimonio();
+  else if(t==='caja')renderCajaInterna();
+  else if(t==='prestamos')renderPrestamos();
+  else if(t==='cuotas')renderCuotas();
+  else if(t==='nuevo')renderNuevo();
+  else if(t==='nuevocuota')renderNuevoCuota();
+}
+function refresh(){ ['dashboard','historial','analisis','patrimonio','prestamos','cuotas'].forEach(function(t){renderTab(t);}); }
+
+// ============================================================
+// INIT
+// ============================================================
+document.getElementById('today-date').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+function descargarBackup(){
+  var backup={
+    fecha:new Date().toISOString(),
+    version:'v5',
+    loans:loans,
+    cuotaLoans:cuotaLoans,
+    historialPrestamos:historialPrestamos,
+    patrimonioBolsas:patrimonioBolsas,
+    cajaInterna:cajaInterna
+  };
+  var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='gestion-patrimonial-backup-'+todayISO()+'.json';
+  a.click();
+  localStorage.setItem('lastBackupDate',todayISO());
+}
+
+function checkBackupAlerta(){
+  var ultima=localStorage.getItem('lastBackupDate');
+  if(!ultima) return; // primera vez, no molestar
+  var dias=daysBetween(ultima,todayISO());
+  if(dias<7) return;
+  var html='<div id="backup-banner" style="position:fixed;bottom:20px;right:16px;z-index:999;max-width:320px;background:#1d4ed8;border-radius:var(--radius);padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,0.5);">';
+  html+='<div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:6px;">💾 Backup pendiente</div>';
+  html+='<div style="font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:10px;">Han pasado <b>'+dias+' días</b> desde tu último backup. Recomendamos descargar uno ahora.</div>';
+  html+='<div style="display:flex;gap:8px;">';
+  html+='<button onclick="descargarBackup();document.getElementById(\'backup-banner\').remove();" style="flex:1;padding:6px;font-size:12px;background:#fff;color:#1d4ed8;border:none;border-radius:4px;font-weight:600;cursor:pointer;">Descargar ahora</button>';
+  html+='<button onclick="localStorage.setItem(\'lastBackupDate\',\''+todayISO()+'\');document.getElementById(\'backup-banner\').remove();" style="padding:6px 10px;font-size:12px;background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:4px;cursor:pointer;">Más tarde</button>';
+  html+='</div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+
+// RESTAURAR BACKUP 09-JUL-2026 (EFECTIVO CORREGIDO A 9000)
+async function restaurarDesdeBackup(){
+  showConfirmModal('¿Restaurar datos desde el backup limpio del 09/07/2026?', async function(){
+    setSyncStatus('syncing');
+    try{
+      loans = [{"id": "p_1782542581973_4042", "tasa": 0.2, "monto": 1000, "pagos": [{"cuota": 1, "fecha": "2023-07-28"}, {"cuota": 2, "fecha": "2023-08-17"}, {"cuota": 3, "fecha": "2023-09-17"}, {"cuota": 4, "fecha": "2023-10-15"}, {"cuota": 5, "fecha": "2023-11-14"}, {"cuota": 6, "fecha": "2024-01-04"}, {"cuota": 7, "fecha": "2024-01-19"}, {"cuota": 8, "fecha": "2024-02-16"}, {"cuota": 9, "fecha": "2024-03-20"}, {"cuota": 10, "fecha": "2024-04-17"}, {"cuota": 11, "fecha": "2024-05-16"}, {"cuota": 12, "fecha": "2024-06-20"}, {"cuota": 13, "fecha": "2024-07-13"}, {"cuota": 14, "fecha": "2024-08-13"}, {"cuota": 15, "fecha": "2024-09-15"}, {"cuota": 16, "fecha": "2024-10-16"}, {"cuota": 17, "fecha": "2024-11-25"}, {"cuota": 18, "fecha": "2024-12-22"}, {"cuota": 19, "fecha": "2025-01-13"}, {"cuota": 20, "fecha": "2025-02-13"}, {"cuota": 21, "fecha": "2025-03-19"}, {"cuota": 22, "fecha": "2025-04-19"}, {"cuota": 23, "fecha": "2025-05-16"}, {"cuota": 24, "fecha": "2025-06-15"}, {"cuota": 25, "fecha": "2025-07-18"}, {"cuota": 26, "fecha": "2025-08-16"}, {"cuota": 27, "fecha": "2025-09-14"}, {"cuota": 28, "fecha": "2025-10-14"}, {"cuota": 29, "fecha": "2025-11-16"}, {"cuota": 30, "fecha": "2025-12-10"}, {"cuota": 31, "fecha": "2026-01-15"}, {"cuota": 32, "fecha": "2025-02-15"}], "estado": "activo", "nombre": "Percy", "comisionPct": 35, "fechaInicio": "2023-06-11", "abonosCapital": [{"id": "p_1782542581973_7042", "fecha": "2024-11-25", "monto": 500}], "comisionTramos": [{"pct": 30, "desdeCuota": 18}], "historialCapital": [{"fecha": "2023-06-11", "saldo": 1000}, {"fecha": "2024-11-25", "saldo": 500, "abonoId": "p_1782542581973_7042", "abonoMonto": 500}]}, {"id": "p_1782542581974_7974", "tasa": 0.2, "monto": 300, "pagos": [{"cuota": 1, "fecha": "2026-01-30"}, {"cuota": 2, "fecha": "2026-02-26"}, {"cuota": 3, "fecha": "2026-04-05"}, {"cuota": 4, "fecha": "2026-04-26"}, {"cuota": 5, "fecha": "2026-05-26"}], "estado": "activo", "nombre": "Sandra", "comisionPct": 20, "fechaInicio": "2025-12-26", "abonosCapital": [], "historialCapital": [{"fecha": "2025-12-26", "saldo": 300}]}, {"id": "p_1782542581974_4451", "tasa": 0.2, "monto": 1500, "pagos": [{"cuota": 1, "fecha": "2026-02-15"}, {"cuota": 2, "fecha": "2026-04-07"}, {"cuota": 3, "fecha": "2026-04-13"}, {"cuota": 4, "fecha": "2026-05-22"}], "estado": "activo", "nombre": "Karina (Joel)", "comisionPct": 20, "fechaInicio": "2026-01-06", "abonosCapital": [], "historialCapital": [{"fecha": "2026-01-06", "saldo": 1500}]}, {"id": "p_1782542581974_3650", "tasa": 0.2, "monto": 300, "pagos": [], "estado": "activo", "nombre": "Karina (Rosa)", "comisionPct": 20, "fechaInicio": "2026-05-16", "abonosCapital": [], "historialCapital": [{"fecha": "2026-05-16", "saldo": 300}]}, {"id": "p_1782542581974_3121", "tasa": 0.2, "monto": 1500, "pagos": [], "estado": "activo", "nombre": "Karina - moto", "comisionPct": 20, "fechaInicio": "2026-05-19", "abonosCapital": [], "historialCapital": [{"fecha": "2026-05-19", "saldo": 1500}]}, {"id": "p_1782542581974_12", "tasa": 0.1, "monto": 300, "pagos": [], "estado": "activo", "nombre": "Davis 1", "comisionPct": 0, "fechaInicio": "2026-05-19", "abonosCapital": [], "historialCapital": [{"fecha": "2026-05-19", "saldo": 300}]}, {"id": "p_1782542581974_2595", "tasa": 0.1, "monto": 200, "pagos": [], "estado": "activo", "nombre": "Davis 2", "comisionPct": 0, "fechaInicio": "2026-05-29", "abonosCapital": [], "historialCapital": [{"fecha": "2026-05-29", "saldo": 200}]}, {"id": "p_1782542581974_1156", "tasa": 0.15, "monto": 400, "pagos": [{"cuota": 1, "fecha": "2026-06-01"}], "estado": "activo", "nombre": "Jean Pier", "comisionPct": 0, "fechaInicio": "2026-05-13", "abonosCapital": [], "historialCapital": [{"fecha": "2026-05-13", "saldo": 400}]}, {"id": "p_1782542581974_7163", "tasa": 0.2, "monto": 300, "pagos": [], "estado": "activo", "nombre": "Juan - tía Ani", "comisionPct": 0, "fechaInicio": "2026-06-07", "abonosCapital": [], "historialCapital": [{"fecha": "2026-06-07", "saldo": 300}]}, {"id": "p_1782542581974_682", "tasa": 0.2, "monto": 1200, "pagos": [], "estado": "activo", "nombre": "Víctor Farías", "comisionPct": 0, "fechaInicio": "2026-06-13", "abonosCapital": [], "historialCapital": [{"fecha": "2026-06-13", "saldo": 1200}]}];
+      cuotaLoans = [{"id": "p_1782542581974_2272", "tasa": 0, "monto": 3600, "pagos": [{"cuota": 1, "fecha": "2025-12-27"}, {"cuota": 2, "fecha": "2026-03-25"}, {"cuota": 3, "fecha": "2026-04-16"}, {"cuota": 4, "fecha": "2026-05-16"}], "estado": "activo", "nombre": "Rosa Yovera - equipo", "numCuotas": 6, "fechaInicio": "2025-11-12"}, {"id": "p_1782542581974_3261", "tasa": 0.15, "monto": 2500, "pagos": [], "estado": "activo", "nombre": "Tío de Jhiosmar", "numCuotas": 3, "fechaInicio": "2026-06-02"}];
+      historialPrestamos = [{"id": "hist_ec_0", "tasa": 0.03, "tipo": "historico", "meses": 6, "pagos": [], "nombre": "ROSA YOVERA 1", "fechaCierre": "2023-02-02", "fechaInicio": "2022-08-02", "montoInicial": 1000, "comisionTotal": 0, "intTotalGenerado": 180}, {"id": "hist_ec_1", "tasa": 0.1, "tipo": "historico", "meses": 12, "pagos": [], "nombre": "ENMA DOLORIER", "fechaCierre": "2023-02-21", "fechaInicio": "2022-02-21", "montoInicial": 1000, "comisionTotal": 0, "intTotalGenerado": 640}, {"id": "hist_ec_2", "tasa": 0, "tipo": "historico", "meses": 4, "pagos": [], "nombre": "ROSA YOVERA 2", "fechaCierre": "2023-01-12", "fechaInicio": "2022-09-12", "montoInicial": 500, "comisionTotal": 0, "intTotalGenerado": 0}, {"id": "hist_ec_3", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "PERCY 1", "fechaCierre": "2022-06-24", "fechaInicio": "2022-04-24", "montoInicial": 1000, "comisionTotal": 200, "intTotalGenerado": 400}, {"id": "hist_ec_4", "tasa": 0.2, "tipo": "historico", "meses": 5, "pagos": [], "nombre": "PERCY 2", "fechaCierre": "2022-12-09", "fechaInicio": "2022-07-09", "montoInicial": 1500, "comisionTotal": 500, "intTotalGenerado": 1000}, {"id": "hist_ec_5", "tasa": 0.03, "tipo": "historico", "meses": 6, "pagos": [], "nombre": "ROSA YOVERA 3", "fechaCierre": "2023-02-02", "fechaInicio": "2022-08-02", "montoInicial": 1000, "comisionTotal": 0, "intTotalGenerado": 180}, {"id": "hist_ec_6", "tasa": 0.2, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "PERCY 3", "fechaCierre": "2023-03-30", "fechaInicio": "2022-12-30", "montoInicial": 1000, "comisionTotal": 210, "intTotalGenerado": 390}, {"id": "hist_ec_7", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "VICTOR 1", "fechaCierre": "2023-04-27", "fechaInicio": "2023-03-27", "montoInicial": 800, "comisionTotal": 0, "intTotalGenerado": 160}, {"id": "hist_ec_8", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "VICTOR 2", "fechaCierre": "2023-06-07", "fechaInicio": "2023-05-07", "montoInicial": 150, "comisionTotal": 0, "intTotalGenerado": 15}, {"id": "hist_ec_9", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "VICTOR 3", "fechaCierre": "2023-07-15", "fechaInicio": "2023-06-15", "montoInicial": 100, "comisionTotal": 0, "intTotalGenerado": 10}, {"id": "hist_ec_10", "tasa": 0.2, "tipo": "historico", "meses": 4, "pagos": [], "nombre": "VICTOR 4", "fechaCierre": "2023-11-04", "fechaInicio": "2023-07-04", "montoInicial": 700, "comisionTotal": 0, "intTotalGenerado": 560}, {"id": "hist_ec_11", "tasa": 0.15, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "MAMÁ VICTOR", "fechaCierre": "2023-11-06", "fechaInicio": "2023-10-06", "montoInicial": 500, "comisionTotal": 0, "intTotalGenerado": 75}, {"id": "hist_ec_12", "tasa": 0.17, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "JHOSMAR DAVILA", "fechaCierre": "2023-02-04", "fechaInicio": "2023-01-04", "montoInicial": 1000, "comisionTotal": 0, "intTotalGenerado": 170}, {"id": "hist_ec_13", "tasa": 0.03, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "ESTEFANY ARRIETA 1", "fechaCierre": "2023-02-15", "fechaInicio": "2023-01-15", "montoInicial": 400, "comisionTotal": 0, "intTotalGenerado": 12}, {"id": "hist_ec_14", "tasa": 0.05, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "ESTEFANY ARRIETA 2", "fechaCierre": "2024-04-13", "fechaInicio": "2024-03-13", "montoInicial": 1000, "comisionTotal": 0, "intTotalGenerado": 25}, {"id": "hist_ec_15", "tasa": 0.03, "tipo": "historico", "meses": 12, "pagos": [], "nombre": "ROSA YOVERA 4", "fechaCierre": "2024-05-23", "fechaInicio": "2023-05-23", "montoInicial": 7500, "comisionTotal": 0, "intTotalGenerado": 1462.5}, {"id": "hist_ec_16", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "SANDRA", "fechaCierre": "2024-05-03", "fechaInicio": "2024-04-03", "montoInicial": 600, "comisionTotal": 36, "intTotalGenerado": 84}, {"id": "hist_ec_17", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "ANA YOVERA", "fechaCierre": "2024-05-21", "fechaInicio": "2024-04-21", "montoInicial": 300, "comisionTotal": 18, "intTotalGenerado": 42}, {"id": "hist_ec_18", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA YOVERA", "fechaCierre": "2024-06-01", "fechaInicio": "2024-05-01", "montoInicial": 300, "comisionTotal": 9, "intTotalGenerado": 21}, {"id": "hist_ec_19", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "Ana Yovera", "fechaCierre": "2024-06-10", "fechaInicio": "2024-04-10", "montoInicial": 300, "comisionTotal": 36, "intTotalGenerado": 84}, {"id": "hist_ec_20", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "SANDRA 2", "fechaCierre": "2024-06-24", "fechaInicio": "2024-05-24", "montoInicial": 100, "comisionTotal": 6, "intTotalGenerado": 14}, {"id": "hist_ec_21", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA YOVERA", "fechaCierre": "2024-06-19", "fechaInicio": "2024-05-19", "montoInicial": 100, "comisionTotal": 6, "intTotalGenerado": 14}, {"id": "hist_ec_22", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "MIS ROSA", "fechaCierre": "2024-07-01", "fechaInicio": "2024-05-01", "montoInicial": 150, "comisionTotal": 18, "intTotalGenerado": 42}, {"id": "hist_ec_23", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "(SANDRA)", "fechaCierre": "2024-07-11", "fechaInicio": "2024-06-11", "montoInicial": 300, "comisionTotal": 18, "intTotalGenerado": 42}, {"id": "hist_ec_24", "tasa": 0.2, "tipo": "historico", "meses": 5, "pagos": [], "nombre": "Mamá de Victor", "fechaCierre": "2024-06-30", "fechaInicio": "2024-01-30", "montoInicial": 1000, "comisionTotal": 0, "intTotalGenerado": 1000}, {"id": "hist_ec_25", "tasa": 0.05, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "ESTEFANY ARRIETA", "fechaCierre": "2024-06-17", "fechaInicio": "2024-05-17", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 20}, {"id": "hist_ec_26", "tasa": 0, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "MONICA SALINAS", "fechaCierre": "2024-07-12", "fechaInicio": "2024-05-12", "montoInicial": 110, "comisionTotal": 0, "intTotalGenerado": 0}, {"id": "hist_ec_27", "tasa": 0.1, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "Hermana Rosa", "fechaCierre": "2024-08-22", "fechaInicio": "2024-06-22", "montoInicial": 100, "comisionTotal": 0, "intTotalGenerado": 10}, {"id": "hist_ec_28", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "Ricardo Yovera", "fechaCierre": "2024-07-09", "fechaInicio": "2024-05-09", "montoInicial": 800, "comisionTotal": 54, "intTotalGenerado": 126}, {"id": "hist_ec_29", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "KARINA YOVERA", "fechaCierre": "2024-07-19", "fechaInicio": "2024-05-19", "montoInicial": 100, "comisionTotal": 6, "intTotalGenerado": 14}, {"id": "hist_ec_30", "tasa": 0.2, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "COCO (SANDRA)", "fechaCierre": "2024-07-21", "fechaInicio": "2024-04-21", "montoInicial": 800, "comisionTotal": 144, "intTotalGenerado": 336}, {"id": "hist_ec_31", "tasa": 0.15, "tipo": "historico", "meses": 6, "pagos": [], "nombre": "JHIOSMAR DÁVILA", "fechaCierre": "2024-07-27", "fechaInicio": "2024-01-27", "montoInicial": 3000, "comisionTotal": 0, "intTotalGenerado": 1575}, {"id": "hist_ec_32", "tasa": 0.2, "tipo": "historico", "meses": 0, "pagos": [], "nombre": "JHAMPIER FIGUEREDO", "fechaCierre": "2024-09-14", "fechaInicio": "2024-09-14", "montoInicial": 400, "comisionTotal": 0, "intTotalGenerado": 10}, {"id": "hist_ec_33", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "MANA ROSA", "fechaCierre": "2024-09-27", "fechaInicio": "2024-08-27", "montoInicial": 120, "comisionTotal": 0, "intTotalGenerado": 12}, {"id": "hist_ec_34", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA", "fechaCierre": "2024-09-22", "fechaInicio": "2024-08-22", "montoInicial": 500, "comisionTotal": 15, "intTotalGenerado": 35}, {"id": "hist_ec_35", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "RICARDO YOVERA", "fechaCierre": "2024-09-18", "fechaInicio": "2024-07-18", "montoInicial": 600, "comisionTotal": 42, "intTotalGenerado": 98}, {"id": "hist_ec_36", "tasa": 0.05, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "MANA ESTEFANY", "fechaCierre": "2024-10-25", "fechaInicio": "2024-09-25", "montoInicial": 100, "comisionTotal": 0, "intTotalGenerado": 5}, {"id": "hist_ec_37", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "JHAMPIER", "fechaCierre": "2024-11-12", "fechaInicio": "2024-10-12", "montoInicial": 400, "comisionTotal": 0, "intTotalGenerado": 80}, {"id": "hist_ec_38", "tasa": 0.2, "tipo": "historico", "meses": 10, "pagos": [], "nombre": "CUTO", "fechaCierre": "2024-11-05", "fechaInicio": "2024-01-05", "montoInicial": 500, "comisionTotal": 10, "intTotalGenerado": 990}, {"id": "hist_ec_39", "tasa": 0.05, "tipo": "historico", "meses": 0.25, "pagos": [], "nombre": "KARINA", "fechaCierre": "2024-11-12", "fechaInicio": "2024-11-12", "montoInicial": 500, "comisionTotal": 7, "intTotalGenerado": 18}, {"id": "hist_ec_40", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "MANA ROSA", "fechaCierre": "2024-11-20", "fechaInicio": "2024-10-20", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 20}, {"id": "hist_ec_41", "tasa": 0.15, "tipo": "historico", "meses": 14, "pagos": [], "nombre": "VICTOR", "fechaCierre": "2025-01-06", "fechaInicio": "2023-11-06", "montoInicial": 500, "comisionTotal": 0, "intTotalGenerado": 1000}, {"id": "hist_ec_42", "tasa": 0.05, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "ESTEFANY", "fechaCierre": "2025-01-11", "fechaInicio": "2024-12-11", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 10}, {"id": "hist_ec_43", "tasa": 0.2, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "KARINA", "fechaCierre": "2025-05-19", "fechaInicio": "2025-02-19", "montoInicial": 1000, "comisionTotal": 100, "intTotalGenerado": 400}, {"id": "hist_ec_44", "tasa": 0, "tipo": "historico", "meses": 0, "pagos": [], "nombre": "JUAN CARLOS", "fechaCierre": "2024-04-30", "fechaInicio": "2024-04-30", "montoInicial": 2000, "comisionTotal": 0, "intTotalGenerado": 100}, {"id": "hist_ec_45", "tasa": 0.15, "tipo": "historico", "meses": 5, "pagos": [], "nombre": "JHOSMAR DÁVILA", "fechaCierre": "2025-03-17", "fechaInicio": "2024-10-17", "montoInicial": 2000, "comisionTotal": 0, "intTotalGenerado": 900}, {"id": "hist_ec_46", "tasa": 0.15, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "JHOSMAR", "fechaCierre": "2025-03-19", "fechaInicio": "2025-02-19", "montoInicial": 1500, "comisionTotal": 0, "intTotalGenerado": 225}, {"id": "hist_ec_47", "tasa": 0.1, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "MANA ROSA", "fechaCierre": "2025-03-24", "fechaInicio": "2024-12-24", "montoInicial": 100, "comisionTotal": 0, "intTotalGenerado": 30}, {"id": "hist_ec_48", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "JHAMPIER", "fechaCierre": "2025-04-08", "fechaInicio": "2025-02-08", "montoInicial": 350, "comisionTotal": 0, "intTotalGenerado": 140}, {"id": "hist_ec_49", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "MANA ROSA", "fechaCierre": "2025-05-27", "fechaInicio": "2025-04-27", "montoInicial": 100, "comisionTotal": 0, "intTotalGenerado": 10}, {"id": "hist_ec_50", "tasa": 0.1, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "Davis Alvarado", "fechaCierre": "2025-06-02", "fechaInicio": "2025-04-02", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 40}, {"id": "hist_ec_51", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "ELVA", "fechaCierre": "2025-05-16", "fechaInicio": "2025-03-16", "montoInicial": 500, "comisionTotal": 90, "intTotalGenerado": 210}, {"id": "hist_ec_52", "tasa": 0.2, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "KARINA", "fechaCierre": "2025-06-18", "fechaInicio": "2025-03-18", "montoInicial": 1000, "comisionTotal": 180, "intTotalGenerado": 420}, {"id": "hist_ec_53", "tasa": 0.15, "tipo": "historico", "meses": 8, "pagos": [], "nombre": "SANDRA", "fechaCierre": "2025-09-07", "fechaInicio": "2025-01-07", "montoInicial": 3800, "comisionTotal": 408, "intTotalGenerado": 1646.9}, {"id": "hist_ec_54", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "MANA ROSA", "fechaCierre": "2025-07-24", "fechaInicio": "2025-06-24", "montoInicial": 150, "comisionTotal": 0, "intTotalGenerado": 15}, {"id": "hist_ec_55", "tasa": 0.15, "tipo": "historico", "meses": 6, "pagos": [], "nombre": "MAMÁ DE JHOSMAR", "fechaCierre": "2025-08-20", "fechaInicio": "2025-02-20", "montoInicial": 3500, "comisionTotal": 0, "intTotalGenerado": 1838.25}, {"id": "hist_ec_56", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "Tia Ani", "fechaCierre": "2025-09-11", "fechaInicio": "2025-08-11", "montoInicial": 300, "comisionTotal": 12, "intTotalGenerado": 48}, {"id": "hist_ec_57", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA 2", "fechaCierre": "2025-08-04", "fechaInicio": "2025-07-04", "montoInicial": 1000, "comisionTotal": 60, "intTotalGenerado": 140}, {"id": "hist_ec_58", "tasa": 0.1, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "KARINA", "fechaCierre": "2025-09-05", "fechaInicio": "2025-06-05", "montoInicial": 5000, "comisionTotal": 200, "intTotalGenerado": 800}, {"id": "hist_ec_59", "tasa": 0.1, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "MANA ROSA", "fechaCierre": "2025-10-23", "fechaInicio": "2025-08-23", "montoInicial": 150, "comisionTotal": 0, "intTotalGenerado": 19.5}, {"id": "hist_ec_60", "tasa": 0.2, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "TIO RICARDO", "fechaCierre": "2025-11-09", "fechaInicio": "2025-08-09", "montoInicial": 500, "comisionTotal": 44, "intTotalGenerado": 176}, {"id": "hist_ec_61", "tasa": 0.15, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "JEAN PIERE", "fechaCierre": "2025-11-25", "fechaInicio": "2025-09-25", "montoInicial": 500, "comisionTotal": 0, "intTotalGenerado": 150}, {"id": "hist_ec_62", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "KARINA", "fechaCierre": "2025-11-14", "fechaInicio": "2025-09-14", "montoInicial": 1000, "comisionTotal": 80, "intTotalGenerado": 320}, {"id": "hist_ec_63", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "TIA ANI", "fechaCierre": "2025-12-01", "fechaInicio": "2025-11-01", "montoInicial": 150, "comisionTotal": 6, "intTotalGenerado": 24}, {"id": "hist_ec_64", "tasa": 0.03, "tipo": "historico", "meses": 6, "pagos": [], "nombre": "ROSA YOVERA", "fechaCierre": "2025-04-17", "fechaInicio": "2024-10-17", "montoInicial": 2000, "comisionTotal": 0, "intTotalGenerado": 210}, {"id": "hist_ec_65", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA", "fechaCierre": "2025-12-19", "fechaInicio": "2025-11-19", "montoInicial": 1000, "comisionTotal": 40, "intTotalGenerado": 160}, {"id": "hist_ec_66", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "KARINA", "fechaCierre": "2025-12-20", "fechaInicio": "2025-10-20", "montoInicial": 300, "comisionTotal": 24, "intTotalGenerado": 96}, {"id": "hist_ec_67", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "ROSA", "fechaCierre": "2026-01-14", "fechaInicio": "2025-12-14", "montoInicial": 100, "comisionTotal": 0, "intTotalGenerado": 10}, {"id": "hist_ec_68", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "DAVIS", "fechaCierre": "2026-01-16", "fechaInicio": "2025-12-16", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 20}, {"id": "hist_ec_69", "tasa": 0.2, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "GUSMAN - KARINA", "fechaCierre": "2026-01-30", "fechaInicio": "2025-11-30", "montoInicial": 500, "comisionTotal": 40, "intTotalGenerado": 160}, {"id": "hist_ec_70", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA", "fechaCierre": "2026-01-30", "fechaInicio": "2025-12-30", "montoInicial": 300, "comisionTotal": 6, "intTotalGenerado": 24}, {"id": "hist_ec_71", "tasa": 0.032, "tipo": "historico", "meses": 5, "pagos": [], "nombre": "HUANCA", "fechaCierre": "2026-02-05", "fechaInicio": "2025-09-05", "montoInicial": 5800, "comisionTotal": 0, "intTotalGenerado": 800}, {"id": "hist_ec_72", "tasa": 0.15, "tipo": "historico", "meses": 4, "pagos": [], "nombre": "JHOSMAR", "fechaCierre": "2026-02-16", "fechaInicio": "2025-10-16", "montoInicial": 3000, "comisionTotal": 0, "intTotalGenerado": 1125}, {"id": "hist_ec_73", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA", "fechaCierre": "2026-03-12", "fechaInicio": "2026-02-12", "montoInicial": 300, "comisionTotal": 12, "intTotalGenerado": 48}, {"id": "hist_ec_74", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "DAVIS", "fechaCierre": "2026-03-09", "fechaInicio": "2026-02-09", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 20}, {"id": "hist_ec_75", "tasa": 0.2, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "KARINA", "fechaCierre": "2026-04-10", "fechaInicio": "2026-03-10", "montoInicial": 1000, "comisionTotal": 40, "intTotalGenerado": 160}, {"id": "hist_ec_76", "tasa": 0.15, "tipo": "historico", "meses": 3, "pagos": [], "nombre": "JHAMPIER", "fechaCierre": "2025-04-20", "fechaInicio": "2025-01-20", "montoInicial": 500, "comisionTotal": 0, "intTotalGenerado": 225}, {"id": "hist_ec_77", "tasa": 0.2, "tipo": "historico", "meses": 5, "pagos": [], "nombre": "JOEL - KARINA", "fechaCierre": "2026-04-26", "fechaInicio": "2025-11-26", "montoInicial": 1000, "comisionTotal": 200, "intTotalGenerado": 800}, {"id": "hist_ec_78", "tasa": 0.1, "tipo": "historico", "meses": 2, "pagos": [], "nombre": "DAVIS", "fechaCierre": "2026-05-14", "fechaInicio": "2026-03-14", "montoInicial": 300, "comisionTotal": 0, "intTotalGenerado": 60}, {"id": "hist_ec_79", "tasa": 0.1, "tipo": "historico", "meses": 1, "pagos": [], "nombre": "DAVIS", "fechaCierre": "2026-05-15", "fechaInicio": "2026-04-15", "montoInicial": 200, "comisionTotal": 0, "intTotalGenerado": 20}];
+      patrimonioBolsas = [{"id": "bol_1", "tipo": "efectivo", "fecha": "2026-07-09", "monto": 9000, "notas": "Capital líquido en cuenta", "nombre": "Efectivo disponible"}, {"id": "bol_2", "tipo": "inversion", "fecha": "2026-06-27", "monto": 0, "notas": "Por iniciar en broker", "nombre": "Inversiones (acciones/ETFs)"}];
+      cajaInterna = {"andrea": {"junta": [{"abono": 0, "fecha": "2023-01-09", "saldo": 1870, "motivo": "Pasajes de la U", "salida": 100}, {"abono": 0, "fecha": "2023-01-17", "saldo": 1970, "motivo": "gym", "salida": 100}, {"abono": 0, "fecha": "2023-03-03", "saldo": 2070, "motivo": "viaje", "salida": 100}, {"abono": 0, "fecha": "2023-04-30", "saldo": 2120, "motivo": "gym", "salida": 50}, {"abono": 0, "fecha": "2023-05-31", "saldo": 2220, "motivo": "gym", "salida": 100}, {"abono": 0, "fecha": "2023-07-26", "saldo": 2300, "motivo": "pago de deudas", "salida": 80}, {"abono": 0, "fecha": "2023-07-27", "saldo": 2400, "motivo": "gym", "salida": 100}, {"abono": 0, "fecha": "2024-04-21", "saldo": 2900, "motivo": "pagar deuda", "salida": 500}, {"abono": 0, "fecha": "2024-08-03", "saldo": 3200, "motivo": "compras centro", "salida": 300}, {"abono": 0, "fecha": "2024-10-02", "saldo": 3400, "motivo": "pagar deuda", "salida": 200}, {"abono": 0, "fecha": "2024-10-12", "saldo": 3434, "motivo": "DUCHA", "salida": 34}, {"abono": 0, "fecha": "2024-10-05", "saldo": 4634, "motivo": "celular", "salida": 1200}, {"abono": 0, "fecha": "2024-08-06", "saldo": 4884, "motivo": "GYM", "salida": 250}, {"abono": 0, "fecha": "2025-04-13", "saldo": 5284, "motivo": "ropa", "salida": 400}, {"abono": 0, "fecha": "2025-06-27", "saldo": 5344, "motivo": "pasaje viaje", "salida": 60}, {"abono": 0, "fecha": "2025-08-01", "saldo": 5944, "motivo": "CABLES Y DUCHA", "salida": 600}, {"abono": 0, "fecha": "2025-10-02", "saldo": 6444, "motivo": "SUELDO", "salida": 500}], "intereses": [{"abono": 0, "fecha": "2023-08-06", "saldo": 200, "motivo": "promoción", "salida": 200}, {"abono": 0, "fecha": "2023-08-12", "saldo": 300, "motivo": "promoción", "salida": 100}, {"abono": 0, "fecha": "2023-09-20", "saldo": 350, "motivo": "gastos", "salida": 50}, {"abono": 0, "fecha": "2023-09-25", "saldo": 400, "motivo": "gastos", "salida": 50}, {"abono": 0, "fecha": "2023-09-26", "saldo": 450, "motivo": "regalo", "salida": 50}, {"abono": 0, "fecha": "2023-10-19", "saldo": 550, "motivo": "pasaje", "salida": 100}, {"abono": 0, "fecha": "2023-11-07", "saldo": 700, "motivo": "GYM", "salida": 150}, {"abono": 0, "fecha": "2023-12-15", "saldo": 975, "motivo": "ropa y pintura", "salida": 275}, {"abono": 0, "fecha": "2023-12-07", "saldo": 1075, "motivo": "viaje a Huánuco", "salida": 100}, {"abono": 0, "fecha": "2023-12-08", "saldo": 1150, "motivo": "pasaje", "salida": 75}, {"abono": 100, "fecha": "2024-05-05", "saldo": 1050, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "18/25/2024", "saldo": 1080, "motivo": "ROPA", "salida": 30}, {"abono": 100, "fecha": "2024-05-26", "saldo": 980, "motivo": "", "salida": 0}, {"abono": 100, "fecha": "2024-06-02", "saldo": 880, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2024-06-23", "saldo": 900, "motivo": "pasaje", "salida": 20}, {"abono": 100, "fecha": "2024-06-30", "saldo": 800, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2024-07-01", "saldo": 850, "motivo": "COMIDA", "salida": 50}, {"abono": 0, "fecha": "2024-08-05", "saldo": 1050, "motivo": "pasaje", "salida": 200}, {"abono": 100, "fecha": "2024-09-07", "saldo": 950, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2024-12-22", "saldo": 1550, "motivo": "deuda de tarjeta", "salida": 600}, {"abono": 0, "fecha": "2024-01-18", "saldo": 1700, "motivo": "deuda de tarjeta", "salida": 150}, {"abono": 0, "fecha": "2025-02-01", "saldo": 2060, "motivo": "deuda de tarjeta, marcianos, baño, viaje", "salida": 360}, {"abono": 0, "fecha": "2025-05-10", "saldo": 2110, "motivo": "libros y perfume", "salida": 50}, {"abono": 0, "fecha": "-", "saldo": 2121.5, "motivo": "COMPRAS", "salida": 11.5}, {"abono": 0, "fecha": "2025-06-27", "saldo": 2443, "motivo": "gastos viaje", "salida": 321.5}, {"abono": 500, "fecha": "2025-08-06", "saldo": 1943, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2025-09-15", "saldo": 2033, "motivo": "ROPA", "salida": 90}, {"abono": 300, "fecha": "2026-01-24", "saldo": 1733, "motivo": "PAGO", "salida": 0}, {"abono": 1000, "fecha": "2026-02-22", "saldo": 733, "motivo": "pago", "salida": 0}, {"abono": 0, "fecha": "2026-03-24", "saldo": 1033, "motivo": "ALISADO", "salida": 300}, {"abono": 0, "fecha": "2026-05-31", "saldo": 1633, "motivo": "ROPERO", "salida": 600}], "saldo_junta": 6444, "saldo_intereses": 1633, "saldo_inicial_junta": 1770, "saldo_inicial_intereses": 0}, "gustavo": {"junta": [{"abono": 0, "fecha": "2023-01-09", "saldo": 2300, "motivo": "Pasajes de la U", "salida": 100}, {"abono": 0, "fecha": "2023-01-17", "saldo": 2400, "motivo": "gym", "salida": 100}, {"abono": 0, "fecha": "2023-03-03", "saldo": 2700, "motivo": "pagar deudas", "salida": 300}, {"abono": 100, "fecha": "2023-03-31", "saldo": 2600, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2023-04-21", "saldo": 2900, "motivo": "saco de box", "salida": 300}, {"abono": 300, "fecha": "2023-04-26", "saldo": 2600, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2023-04-30", "saldo": 2650, "motivo": "gym", "salida": 50}, {"abono": 0, "fecha": "2023-05-31", "saldo": 2950, "motivo": "saco de box", "salida": 300}, {"abono": 300, "fecha": "2023-05-31", "saldo": 2650, "motivo": "saco de box", "salida": 0}, {"abono": 0, "fecha": "2023-05-31", "saldo": 2750, "motivo": "gym", "salida": 100}, {"abono": 400, "fecha": "2023-06-30", "saldo": 2350, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2023-07-01", "saldo": 2450, "motivo": "gym", "salida": 100}, {"abono": 500, "fecha": "2024-04-21", "saldo": 1950, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2024-08-03", "saldo": 2250, "motivo": "compras centro", "salida": 300}, {"abono": 300, "fecha": "2024-08-06", "saldo": 1950, "motivo": "devolucion de préstamo papá", "salida": 0}, {"abono": 150, "fecha": "2024-09-14", "saldo": 1800, "motivo": "devolucion de préstamo papá", "salida": 0}, {"abono": 150, "fecha": "2024-10-12", "saldo": 1650, "motivo": "devolucion de préstamo papá", "salida": 0}, {"abono": 0, "fecha": "2024-10-06", "saldo": 2450, "motivo": "completar sueldo", "salida": 800}, {"abono": 0, "fecha": "2024-10-10", "saldo": 2484, "motivo": "DUCHA", "salida": 34}, {"abono": 800, "fecha": "2024-10-22", "saldo": 1684, "motivo": "devolución de presvtamo sueldo", "salida": 0}, {"abono": 184, "fecha": "2024-12-21", "saldo": 1500, "motivo": "pago deuda", "salida": 0}, {"abono": 0, "fecha": "2024-08-06", "saldo": 1700, "motivo": "GYM", "salida": 200}, {"abono": 0, "fecha": "2025-04-13", "saldo": 2360, "motivo": "ropa", "salida": 660}, {"abono": 0, "fecha": "2025-06-27", "saldo": 2420, "motivo": "pasaje viaje", "salida": 60}, {"abono": 120, "fecha": "2025-07-28", "saldo": 2300, "motivo": "GRATI", "salida": 0}, {"abono": 0, "fecha": "2025-09-14", "saldo": 2650, "motivo": "SUELDO", "salida": 350}, {"abono": 1000, "fecha": "2026-04-20", "saldo": 1650, "motivo": "PAGO DE LIQUIDACION", "salida": 0}], "intereses": [{"abono": 0, "fecha": "2023-08-06", "saldo": 400, "motivo": "promoción", "salida": 400}, {"abono": 0, "fecha": "2023-08-12", "saldo": 500, "motivo": "prestamo", "salida": 100}, {"abono": 0, "fecha": "2023-09-25", "saldo": 800, "motivo": "prestamo carmen alfaro", "salida": 300}, {"abono": 0, "fecha": "2023-04-26", "saldo": 850, "motivo": "regalo", "salida": 50}, {"abono": 0, "fecha": "2023-09-30", "saldo": 950, "motivo": "pasaje trabajo(vino tía ani)", "salida": 100}, {"abono": 0, "fecha": "2023-08-29", "saldo": 1050, "motivo": "pasaje trabajo", "salida": 100}, {"abono": 0, "fecha": "2023-09-30", "saldo": 1150, "motivo": "gym", "salida": 100}, {"abono": 0, "fecha": "2023-11-07", "saldo": 1250, "motivo": "gym", "salida": 100}, {"abono": 100, "fecha": "2023-11-08", "saldo": 1150, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2023-12-15", "saldo": 1625, "motivo": "ropa y pintura", "salida": 475}, {"abono": 300, "fecha": "2024-03-10", "saldo": 1325, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2024-05-18", "saldo": 1455, "motivo": "ROPA Y ZAPATILLAS", "salida": 130}, {"abono": 0, "fecha": "2024-06-01", "saldo": 1555, "motivo": "TAMBO", "salida": 100}, {"abono": 0, "fecha": "2024-06-15", "saldo": 1655, "motivo": "PRESTAMO TIO PIPO", "salida": 100}, {"abono": 0, "fecha": "2024-06-30", "saldo": 2405, "motivo": "PARA COMPLETAR SUELDO", "salida": 750}, {"abono": 250, "fecha": "2024-06-10", "saldo": 2155, "motivo": "", "salida": 0}, {"abono": 400, "fecha": "2024-06-10", "saldo": 1755, "motivo": "", "salida": 0}, {"abono": 800, "fecha": "2024-07-23", "saldo": 955, "motivo": "", "salida": 0}, {"abono": 0, "fecha": "2024-08-06", "saldo": 1455, "motivo": "", "salida": 500}, {"abono": 0, "fecha": "2024-08-10", "saldo": 1555, "motivo": "compras", "salida": 100}, {"abono": 300, "fecha": "2024-08-18", "saldo": 1255, "motivo": "completando sueldo", "salida": 0}, {"abono": 0, "fecha": "2024-08-24", "saldo": 1455, "motivo": "Adelanto de internet", "salida": 200}, {"abono": 0, "fecha": "2024-09-01", "saldo": 1885, "motivo": "completar sueldo", "salida": 430}, {"abono": 50, "fecha": "2024-09-07", "saldo": 1835, "motivo": "pago internet 50", "salida": 0}, {"abono": 0, "fecha": "2024-09-22", "saldo": 1955, "motivo": "pasaje", "salida": 120}, {"abono": 0, "fecha": "2024-09-28", "saldo": 2005, "motivo": "REGALO", "salida": 50}, {"abono": 220, "fecha": "2024-10-22", "saldo": 1785, "motivo": "devolución de préstamo sueldo", "salida": 0}, {"abono": 50, "fecha": "2024-10-27", "saldo": 1735, "motivo": "pago internet 50", "salida": 0}, {"abono": 0, "fecha": "2024-11-10", "saldo": 2735, "motivo": "completar sueldo", "salida": 1000}, {"abono": 50, "fecha": "2024-11-10", "saldo": 2685, "motivo": "pago internet 50", "salida": 0}, {"abono": 1000, "fecha": "2024-11-17", "saldo": 1685, "motivo": "devolución de préstamo sueldo", "salida": 0}, {"abono": 185, "fecha": "2024-12-22", "saldo": 1500, "motivo": "pago prestamo", "salida": 0}, {"abono": 50, "fecha": "2024-01-18", "saldo": 1450, "motivo": "pago internet 50", "salida": 0}, {"abono": 0, "fecha": "2025-02-01", "saldo": 1510, "motivo": "marcianos, baño", "salida": 60}, {"abono": 0, "fecha": "2025-05-07", "saldo": 2010, "motivo": "sueldo", "salida": 500}, {"abono": 0, "fecha": "2025-05-10", "saldo": 2110, "motivo": "perfumes", "salida": 100}, {"abono": 0, "fecha": "-", "saldo": 2121.5, "motivo": "COMPRAS", "salida": 11.5}, {"abono": 0, "fecha": "2025-06-16", "saldo": 2241.5, "motivo": "ropa + regalo", "salida": 120}, {"abono": 0, "fecha": "2025-06-27", "saldo": 2563, "motivo": "gastos viaje", "salida": 321.5}, {"abono": 263, "fecha": "2025-07-28", "saldo": 2300, "motivo": "GRATI", "salida": 0}, {"abono": 0, "fecha": "2025-09-15", "saldo": 2400, "motivo": "ROPA", "salida": 100}, {"abono": 0, "fecha": "2025-10-02", "saldo": 2650, "motivo": "PASAJE", "salida": 250}, {"abono": 0, "fecha": "2026-03-07", "saldo": 3040, "motivo": "ROPAA", "salida": 390}, {"abono": 0, "fecha": "2026-05-01", "saldo": 3640, "motivo": "VIAJE OXAPAMPA", "salida": 600}, {"abono": 0, "fecha": "2026-06-06", "saldo": 5790, "motivo": "Salud(GASTRO-DERMA), abr y may.", "salida": 2150}, {"abono": 0, "fecha": "2026-06-06", "saldo": 6240, "motivo": "Licencia de conducir.", "salida": 450}, {"abono": 0, "fecha": "2026-06-06", "saldo": 6840, "motivo": "Cubrir pensión abr y may.", "salida": 600}], "saldo_junta": 1650, "saldo_intereses": 6840, "saldo_inicial_junta": 2200, "saldo_inicial_intereses": 0}};
+      await saveLoans();
+      await saveCuotaLoans();
+      await saveHistorial();
+      await savePatrimonio();
+      await saveCajaInterna();
+      refresh();
+      alert('✓ Datos restaurados. Efectivo: S/ 9,000');
+    }catch(e){ setSyncStatus('error'); alert('Error: '+e.message); }
+  }, 'Sí, restaurar', 'danger', 'Confirmar restauración');
+}
+
+async function init(){
+  try {
+    await loadData();
+  } catch(e) {
+    console.error('Error en loadData:', e);
+    document.getElementById('status-banner').textContent = 'Error cargando datos: ' + e.message;
+    document.getElementById('status-banner').style.display = 'block';
+  }
+  try { renderDashboard(); } catch(e) { console.error('Error renderDashboard:', e); document.getElementById('view-dashboard').innerHTML = '<div style="color:var(--text-danger);padding:20px;">Error en Préstamos: ' + e.message + '</div>'; }
+  
+  try { renderPrestamos(); } catch(e) { console.error('Error renderPrestamos:', e); document.getElementById('view-prestamos').innerHTML = '<div style="color:var(--text-danger);padding:20px;">Error en Préstamos: ' + e.message + '</div>'; }
+  try { renderCuotas(); } catch(e) { console.error('Error renderCuotas:', e); }
+  try { renderAnalisis(); } catch(e) { console.error('Error renderAnalisis:', e); }
+  try { renderNuevo(); } catch(e) { console.error('Error renderNuevo:', e); }
+  try { renderNuevoCuota(); } catch(e) { console.error('Error renderNuevoCuota:', e); }
+
+  // Registrar fecha de primera apertura si no existe
+  if(!localStorage.getItem('lastBackupDate')) localStorage.setItem('lastBackupDate',todayISO());
+  setTimeout(checkBackupAlerta, 1500);
+
+  // Banner de alertas al abrir
+  setTimeout(function(){
+    var alertas=[];
+    var hoy=todayISO();
+    loans.filter(function(l){return l.estado!=='pagado';}).forEach(function(l){
+      var sch=buildSchedule(l);
+      var prox=sch.find(function(s){return !s.pagado;});
+      if(!prox) return;
+      var dias=daysBetween(hoy,prox.fechaVencimiento);
+      if(dias<0) alertas.push({tipo:'mora',msg:'<b>'+l.nombre+'</b> — vencida hace '+Math.abs(dias)+'d ('+fmtDate(prox.fechaVencimiento)+')'});
+      else if(dias<=3) alertas.push({tipo:'prox',msg:'<b>'+l.nombre+'</b> — vence en '+dias+'d ('+fmtDate(prox.fechaVencimiento)+')'});
+    });
+    cuotaLoans.filter(function(l){return l.estado!=='pagado';}).forEach(function(l){
+      var sch=buildCuotaSchedule(l);
+      var prox=sch.find(function(s){return !s.pagado;});
+      if(!prox) return;
+      var dias=daysBetween(hoy,prox.fechaVencimiento);
+      if(dias<0) alertas.push({tipo:'mora',msg:'<b>'+l.nombre+' (cuotas)</b> — vencida hace '+Math.abs(dias)+'d ('+fmtDate(prox.fechaVencimiento)+')'});
+      else if(dias<=3) alertas.push({tipo:'prox',msg:'<b>'+l.nombre+' (cuotas)</b> — vence en '+dias+'d ('+fmtDate(prox.fechaVencimiento)+')'});
+    });
+    if(alertas.length===0) return;
+    var mora=alertas.filter(function(a){return a.tipo==='mora';});
+    var prox=alertas.filter(function(a){return a.tipo==='prox';});
+    var html='<div id="alerta-banner" style="position:fixed;top:60px;right:16px;z-index:999;max-width:340px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,0.4);">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-weight:600;font-size:13px;">📋 Alertas</span><button onclick="document.getElementById(\'alerta-banner\').remove()" style="font-size:12px;padding:2px 8px;">✕</button></div>';
+    if(mora.length>0){
+      html+='<div style="font-size:12px;color:var(--text-danger);font-weight:600;margin-bottom:4px;">En mora ('+mora.length+')</div>';
+      mora.forEach(function(a){html+='<div style="font-size:12px;margin-bottom:3px;">'+a.msg+'</div>';});
+    }
+    if(prox.length>0){
+      html+='<div style="font-size:12px;color:#EF9F27;font-weight:600;margin:'+(mora.length>0?'8px':0)+' 0 4px;">Próximos 3 días ('+prox.length+')</div>';
+      prox.forEach(function(a){html+='<div style="font-size:12px;margin-bottom:3px;">'+a.msg+'</div>';});
+    }
+    html+='</div>';
+    document.body.insertAdjacentHTML('beforeend',html);
+  }, 800);
+}
+
+if(sessionStorage.getItem('auth')==='1') init();
+</script>
+</body>
+</html>
