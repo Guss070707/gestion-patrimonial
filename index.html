@@ -105,6 +105,7 @@
     <h1>📊 Gestión Patrimonial — G&A</h1>
     <div id="header-right">
       <span id="today-date"></span>
+      <button id="undo-btn" onclick="undoAccion()" style="font-size:11px;padding:3px 10px;opacity:0.3;cursor:not-allowed;" title="Deshacer última acción" disabled>↩ Deshacer</button>
       <button onclick="descargarBackup()" style="font-size:11px;padding:3px 10px;opacity:0.6;" title="Descargar backup">💾 Backup</button>
       <span id="sync-status">● Sincronizado</span>
     </div>
@@ -209,6 +210,60 @@ var patrimonioBolsas = [];
 var cajaInterna = {andrea:{junta:[],intereses:[]},gustavo:{junta:[],intereses:[]}};
 var cuotaLoans = [];
 var charts = {};
+
+// ── Sistema de Deshacer ──
+var _undoStack = [];
+var _MAX_UNDO = 10;
+
+function snapshoot(descripcion){
+  _undoStack.push({
+    descripcion: descripcion,
+    loans: JSON.parse(JSON.stringify(loans)),
+    cuotaLoans: JSON.parse(JSON.stringify(cuotaLoans)),
+    patrimonioBolsas: JSON.parse(JSON.stringify(patrimonioBolsas)),
+    historialPrestamos: JSON.parse(JSON.stringify(historialPrestamos)),
+    cajaInterna: JSON.parse(JSON.stringify(cajaInterna))
+  });
+  if(_undoStack.length>_MAX_UNDO) _undoStack.shift();
+  _updateUndoBtn();
+}
+
+function _updateUndoBtn(){
+  var btn=document.getElementById('undo-btn');
+  if(!btn) return;
+  if(_undoStack.length>0){
+    var ultima=_undoStack[_undoStack.length-1];
+    btn.disabled=false;
+    btn.style.opacity='0.8';
+    btn.style.cursor='pointer';
+    btn.title='Deshacer: '+ultima.descripcion;
+    btn.textContent='↩ '+ultima.descripcion;
+  } else {
+    btn.disabled=true;
+    btn.style.opacity='0.3';
+    btn.style.cursor='not-allowed';
+    btn.title='Sin acciones para deshacer';
+    btn.textContent='↩ Deshacer';
+  }
+}
+
+async function undoAccion(){
+  if(_undoStack.length===0) return;
+  var estado=_undoStack.pop();
+  loans=estado.loans;
+  cuotaLoans=estado.cuotaLoans;
+  patrimonioBolsas=estado.patrimonioBolsas;
+  historialPrestamos=estado.historialPrestamos;
+  cajaInterna=estado.cajaInterna;
+  setSyncStatus('syncing');
+  await saveLoans();
+  await saveCuotaLoans();
+  await savePatrimonio();
+  await saveHistorial();
+  await saveCajaInterna();
+  _updateUndoBtn();
+  refresh();
+}
 
 function setSyncStatus(state){
   var el = document.getElementById('sync-status');
@@ -621,8 +676,26 @@ function renderDashboard(){
 function renderPrestamos(){
   var el=document.getElementById('view-prestamos');
   if(loans.length===0){el.innerHTML='<p style="color:var(--text-secondary);">No hay préstamos registrados.</p>';return;}
-  var html='';
-  loans.slice().sort(function(a,b){return (a.estado==='pagado')-(b.estado==='pagado');}).forEach(function(loan){
+  var tabActivo=el._tab||'activos';
+  el._tab=tabActivo;
+  var activos=loans.filter(function(l){return l.estado!=='pagado';});
+  var pagados=loans.filter(function(l){return l.estado==='pagado';});
+  var lista=tabActivo==='activos'?activos:pagados;
+
+  // Sub-tabs
+  var html='<div style="display:flex;gap:8px;margin-bottom:16px;">';
+  html+='<button class="prest-tab" data-tab="activos" style="padding:7px 18px;font-size:13px;font-weight:500;border-radius:var(--radius);border:'+(tabActivo==='activos'?'none':'1px solid var(--border)')+';background:'+(tabActivo==='activos'?'var(--accent)':'var(--bg-secondary)')+';color:'+(tabActivo==='activos'?'#fff':'var(--text-secondary)')+';cursor:pointer;">Activos ('+activos.length+')</button>';
+  html+='<button class="prest-tab" data-tab="pagados" style="padding:7px 18px;font-size:13px;font-weight:500;border-radius:var(--radius);border:'+(tabActivo==='pagados'?'none':'1px solid var(--border)')+';background:'+(tabActivo==='pagados'?'var(--accent)':'var(--bg-secondary)')+';color:'+(tabActivo==='pagados'?'#fff':'var(--text-secondary)')+';cursor:pointer;">Pagados ('+pagados.length+')</button>';
+  html+='</div>';
+
+  if(lista.length===0){
+    html+='<p style="color:var(--text-secondary);">'+( tabActivo==='activos'?'No hay préstamos activos.':'No hay préstamos pagados.')+'</p>';
+    el.innerHTML=html;
+    el.querySelectorAll('.prest-tab').forEach(function(b){b.onclick=function(){el._tab=b.getAttribute('data-tab');renderPrestamos();};});
+    return;
+  }
+
+  lista.forEach(function(loan){
     var st=loanStatus(loan),sch=buildSchedule(loan),tot=loanTotals(loan),saldo=saldoActualDe(loan);
     var ab=(loan.abonosCapital||[]).slice().sort(function(a,b){return a.fecha<b.fecha?-1:1;});
     // Próximo vencimiento
@@ -660,6 +733,7 @@ function renderPrestamos(){
     var numCuota=parseInt(btn.getAttribute('data-cuota'));
     var sch=buildSchedule(l);
     var cuotaItem=sch.find(function(s){return s.cuota===numCuota;});
+    snapshoot('Pagar cuota '+numCuota+' — '+l.nombre);
     l.pagos=l.pagos||[];l.pagos.push({cuota:numCuota,fecha:todayISO()});
     if(cuotaItem) await addInteresEfectivo(cuotaItem.interesReal);
     await saveLoans();refresh();
@@ -669,6 +743,7 @@ function renderPrestamos(){
     var c=parseInt(btn.getAttribute('data-cuota'));
     var sch=buildSchedule(l);
     var cuotaItem=sch.find(function(s){return s.cuota===c;});
+    snapshoot('Deshacer cuota '+c+' — '+l.nombre);
     l.pagos=(l.pagos||[]).filter(function(p){return p.cuota!==c;});
     if(cuotaItem) await addInteresEfectivo(-cuotaItem.interesReal);
     await saveLoans();refresh();
@@ -687,6 +762,7 @@ function renderPrestamos(){
     if(diff!==0) await addInteresEfectivo(diff);
     await saveLoans();refresh();
   };});
+  el.querySelectorAll('.prest-tab').forEach(function(b){b.onclick=function(){el._tab=b.getAttribute('data-tab');renderPrestamos();};});
   el.querySelectorAll('.edit-loan-btn').forEach(function(btn){btn.onclick=function(){
     var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;
     var box=document.getElementById('modal-box');
@@ -743,31 +819,19 @@ function renderPrestamos(){
       closeModal(); await saveLoans(); refresh();
     };
   };});
-  el.querySelectorAll('.capital-btn').forEach(function(btn){btn.onclick=function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;showInputModal('Saldo actual: '+fmtMoney(saldoActualDe(l))+'. Monto a abonar al capital:',async function(m,f){l.abonosCapital=l.abonosCapital||[];l.abonosCapital.push({id:uid(),fecha:f,monto:m});recomputeHistorial(l);await addInteresEfectivo(m);await saveLoans();refresh();});};});
-  el.querySelectorAll('.editabono-btn').forEach(function(btn){btn.onclick=function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;var ab=(l.abonosCapital||[]).find(function(a){return a.id===btn.getAttribute('data-abono');});if(!ab)return;var montoAnterior=ab.monto;showEditAbonoModal(ab.monto,ab.fecha,async function(m,f){var diff=m-montoAnterior;ab.monto=m;ab.fecha=f;recomputeHistorial(l);await addInteresEfectivo(diff);await saveLoans();refresh();});};});
-  el.querySelectorAll('.deleteabono-btn').forEach(function(btn){btn.onclick=function(){showConfirmModal('¿Eliminar este abono? Se recalculará el saldo.',async function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;var ab=(l.abonosCapital||[]).find(function(a){return a.id===btn.getAttribute('data-abono');});var montoAbono=ab?ab.monto:0;l.abonosCapital=(l.abonosCapital||[]).filter(function(a){return a.id!==btn.getAttribute('data-abono');});if(l.estado==='pagado')l.estado='activo';recomputeHistorial(l);await addInteresEfectivo(-montoAbono);await saveLoans();refresh();});};});
+  el.querySelectorAll('.capital-btn').forEach(function(btn){btn.onclick=function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;showInputModal('Saldo actual: '+fmtMoney(saldoActualDe(l))+'. Monto a abonar al capital:',async function(m,f){snapshoot('Abono capital '+fmtMoney(m)+' — '+l.nombre);l.abonosCapital=l.abonosCapital||[];l.abonosCapital.push({id:uid(),fecha:f,monto:m});recomputeHistorial(l);await addInteresEfectivo(m);await saveLoans();refresh();});};});
+  el.querySelectorAll('.editabono-btn').forEach(function(btn){btn.onclick=function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;var ab=(l.abonosCapital||[]).find(function(a){return a.id===btn.getAttribute('data-abono');});if(!ab)return;var montoAnterior=ab.monto;showEditAbonoModal(ab.monto,ab.fecha,async function(m,f){snapshoot('Editar abono — '+l.nombre);var diff=m-montoAnterior;ab.monto=m;ab.fecha=f;recomputeHistorial(l);await addInteresEfectivo(diff);await saveLoans();refresh();});};});
+  el.querySelectorAll('.deleteabono-btn').forEach(function(btn){btn.onclick=function(){showConfirmModal('¿Eliminar este abono? Se recalculará el saldo.',async function(){var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});if(!l)return;var ab=(l.abonosCapital||[]).find(function(a){return a.id===btn.getAttribute('data-abono');});var montoAbono=ab?ab.monto:0;snapshoot('Eliminar abono — '+l.nombre);l.abonosCapital=(l.abonosCapital||[]).filter(function(a){return a.id!==btn.getAttribute('data-abono');});if(l.estado==='pagado')l.estado='activo';recomputeHistorial(l);await addInteresEfectivo(-montoAbono);await saveLoans();refresh();});};});
   el.querySelectorAll('.close-btn').forEach(function(btn){btn.onclick=function(){
     var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});
     if(!l)return;
     showConfirmModal('¿Cerrar el préstamo de <b>'+l.nombre+'</b>? Se moverá al Historial con los datos actuales.',async function(){
+    snapshoot('Cerrar préstamo — '+l.nombre);
     var sch=buildSchedule(l);
     var mesesCerrados=sch.filter(function(s){return s.pagado;}).length;
     var saldoRestante=saldoActualDe(l);
-    historialPrestamos.push({
-      id:'hist_'+Date.now(),
-      nombre:l.nombre,
-      fechaInicio:l.fechaInicio,
-      fechaCierre:todayISO(),
-      montoInicial:l.monto,
-      tasa:l.tasa,
-      meses:mesesCerrados,
-      intTotalGenerado:loanTotals(l).interesRealGenerado,
-      comisionTotal:loanTotals(l).comisionTotal,
-      pagos:[],
-      tipo:'historico'
-    });
+    historialPrestamos.push({id:'hist_'+Date.now(),nombre:l.nombre,fechaInicio:l.fechaInicio,fechaCierre:todayISO(),montoInicial:l.monto,tasa:l.tasa,meses:mesesCerrados,intTotalGenerado:loanTotals(l).interesRealGenerado,comisionTotal:loanTotals(l).comisionTotal,pagos:[],tipo:'historico'});
     await saveHistorial();
-    // El saldo restante vuelve al efectivo al cerrar
     if(saldoRestante>0) await addInteresEfectivo(saldoRestante);
     l.estado='pagado';
     await saveLoans();
@@ -778,21 +842,17 @@ function renderPrestamos(){
     var l=loans.find(function(x){return x.id===btn.getAttribute('data-loan');});
     if(!l)return;
     showConfirmModal('¿Reabrir el préstamo de <b>'+l.nombre+'</b>?',async function(){
+      snapshoot('Reabrir préstamo — '+l.nombre);
       var saldo=saldoActualDe(l);
       var interesNeto=loanTotals(l).interesRealGenerado;
-      // Al reabrir: descontar el saldo (vuelve a estar prestado) y revertir intereses cobrados
       await addInteresEfectivo(-(saldo+interesNeto));
       l.estado='activo';
       await saveLoans();refresh();
     },'Sí, reabrir','primary','Confirmar reapertura');
   };});
   el.querySelectorAll('.delete-btn').forEach(function(btn){btn.onclick=function(){var lid=btn.getAttribute('data-loan'),l=loans.find(function(x){return x.id===lid;});showConfirmModal('¿Eliminar el préstamo de <b>'+(l?l.nombre:'')+'</b>? Esta acción no se puede deshacer.',async function(){
-    if(l&&l.estado!=='pagado'){
-      var saldo=saldoActualDe(l);
-      var interesNeto=loanTotals(l).interesRealGenerado;
-      // Devolver capital y restar intereses cobrados
-      await addInteresEfectivo(saldo-interesNeto);
-    }
+    snapshoot('Eliminar préstamo — '+(l?l.nombre:''));
+    if(l&&l.estado!=='pagado'){var saldo=saldoActualDe(l);var interesNeto=loanTotals(l).interesRealGenerado;await addInteresEfectivo(saldo-interesNeto);}
     loans=loans.filter(function(x){return x.id!==lid;});
     await saveLoans();refresh();});};});
 }
@@ -831,6 +891,7 @@ function renderCuotas(){
     var cuotaItem=sch.find(function(s){return s.cuota===numCuota;});
     var defaultFecha=cuotaItem?cuotaItem.fechaVencimiento:todayISO();
     showDateModal('Registrar pago — Cuota '+numCuota+' de '+l.nombre, defaultFecha, async function(fecha){
+      snapshoot('Pagar cuota '+numCuota+' — '+l.nombre);
       l.pagos=l.pagos||[];
       l.pagos.push({cuota:numCuota,fecha:fecha});
       if(cuotaItem) await addInteresEfectivo(cuotaItem.interes);
@@ -844,6 +905,7 @@ function renderCuotas(){
     var c=parseInt(btn.getAttribute('data-cuota'));
     var sch=buildCuotaSchedule(l);
     var cuotaItem=sch.find(function(s){return s.cuota===c;});
+    snapshoot('Deshacer cuota '+c+' — '+l.nombre);
     l.pagos=(l.pagos||[]).filter(function(p){return p.cuota!==c;});
     l.estado='activo';
     if(cuotaItem) await addInteresEfectivo(-cuotaItem.interes);
@@ -853,12 +915,12 @@ function renderCuotas(){
     var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});
     if(!l)return;
     showConfirmModal('¿Cerrar el préstamo en cuotas de <b>'+l.nombre+'</b>?',async function(){
+      snapshoot('Cerrar cuotas — '+l.nombre);
       var sc=buildCuotaSchedule(l);
       var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);
       var tot=cuotaTotals(l);
       historialPrestamos.push({id:'hist_'+Date.now(),nombre:l.nombre+' (cuotas)',fechaInicio:l.fechaInicio,fechaCierre:todayISO(),montoInicial:l.monto,tasa:l.tasa,meses:l.numCuotas,intTotalGenerado:tot.interesTotal,comisionTotal:0,pagos:[],tipo:'cuotas'});
       await saveHistorial();
-      // Capital pendiente vuelve al efectivo
       if(capitalPendiente>0) await addInteresEfectivo(capitalPendiente);
       l.estado='pagado';
       await saveCuotaLoans();
@@ -869,6 +931,7 @@ function renderCuotas(){
     var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});
     if(!l)return;
     showConfirmModal('¿Reabrir el préstamo en cuotas de <b>'+l.nombre+'</b>?',async function(){
+      snapshoot('Reabrir cuotas — '+l.nombre);
       var sc=buildCuotaSchedule(l);
       var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);
       if(capitalPendiente>0) await addInteresEfectivo(-capitalPendiente);
@@ -893,18 +956,14 @@ function renderCuotas(){
       var fecha=document.getElementById('ec-fecha').value;
       var ncuotas=parseInt(document.getElementById('ec-ncuotas').value);
       if(!nombre||isNaN(tasa)||!fecha||isNaN(ncuotas)){alert('Completa todos los campos.');return;}
+      snapshoot('Editar cuotas — '+l.nombre);
       l.nombre=nombre; l.tasa=tasa/100; l.fechaInicio=fecha; l.numCuotas=ncuotas;
       closeModal(); await saveCuotaLoans(); refresh();
     };
   };});
   el.querySelectorAll('.deletecuota-btn').forEach(function(btn){btn.onclick=function(){var lid=btn.getAttribute('data-loan'),l=cuotaLoans.find(function(x){return x.id===lid;});showConfirmModal('¿Eliminar el préstamo en cuotas de <b>'+(l?l.nombre:'')+'</b>?',async function(){
-    if(l&&l.estado!=='pagado'){
-      var sc=buildCuotaSchedule(l);
-      var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);
-      var interesNeto=cuotaTotals(l).interesTotal;
-      // Devolver capital pendiente y restar intereses cobrados
-      await addInteresEfectivo(capitalPendiente-interesNeto);
-    }
+    snapshoot('Eliminar cuotas — '+(l?l.nombre:''));
+    if(l&&l.estado!=='pagado'){var sc=buildCuotaSchedule(l);var capitalPendiente=sc.filter(function(s){return !s.pagado;}).reduce(function(a,s){return a+s.capital;},0);var interesNeto=cuotaTotals(l).interesTotal;await addInteresEfectivo(capitalPendiente-interesNeto);}
     cuotaLoans=cuotaLoans.filter(function(x){return x.id!==lid;});await saveCuotaLoans();refresh();});};});
 }
 
@@ -919,6 +978,7 @@ function renderNuevo(){
     var nombre=document.getElementById('f-nombre').value.trim(),monto=parseFloat(document.getElementById('f-monto').value),tasa=parseFloat(document.getElementById('f-tasa').value),fecha=document.getElementById('f-fecha').value,com=parseFloat(document.getElementById('f-comision').value)||0;
     if(!nombre||!monto||!tasa||!fecha){alert('Completa todos los campos obligatorios.');return;}
     loans.push({id:uid(),nombre:nombre,monto:monto,tasa:tasa/100,comisionPct:com,fechaInicio:fecha,abonosCapital:[],historialCapital:[{fecha:fecha,saldo:monto}],estado:'activo',pagos:[]});
+    snapshoot('Nuevo préstamo — '+nombre);
     await addInteresEfectivo(-monto);
     await saveLoans();
     document.getElementById('f-msg').style.display='block';
@@ -934,6 +994,7 @@ function renderNuevoCuota(){
     var nombre=document.getElementById('fc-nombre').value.trim(),monto=parseFloat(document.getElementById('fc-monto').value),nc=parseInt(document.getElementById('fc-numcuotas').value),tasa=parseFloat(document.getElementById('fc-tasa').value)||0,fecha=document.getElementById('fc-fecha').value;
     if(!nombre||!monto||!nc||!fecha){alert('Completa todos los campos obligatorios.');return;}
     cuotaLoans.push({id:uid(),nombre:nombre,monto:monto,numCuotas:nc,tasa:tasa/100,fechaInicio:fecha,estado:'activo',pagos:[]});
+    snapshoot('Nuevo préstamo cuotas — '+nombre);
     await addInteresEfectivo(-monto);
     await saveCuotaLoans();
     document.getElementById('fc-msg').style.display='block';
