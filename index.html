@@ -863,8 +863,25 @@ function renderPrestamos(){
 function renderCuotas(){
   var el=document.getElementById('view-cuotas');
   if(cuotaLoans.length===0){el.innerHTML='<p style="color:var(--text-secondary);">No hay préstamos en cuotas registrados.</p>';return;}
-  var html='';
-  cuotaLoans.slice().sort(function(a,b){return (a.estado==='pagado')-(b.estado==='pagado');}).forEach(function(loan){
+  var tabActivo=el._tab||'activos';
+  el._tab=tabActivo;
+  var activos=cuotaLoans.filter(function(l){return l.estado!=='pagado';});
+  var pagados=cuotaLoans.filter(function(l){return l.estado==='pagado';});
+  var lista=tabActivo==='activos'?activos:pagados;
+
+  var html='<div style="display:flex;gap:8px;margin-bottom:16px;">';
+  html+='<button class="cuota-tab" data-tab="activos" style="padding:7px 18px;font-size:13px;font-weight:500;border-radius:var(--radius);border:'+(tabActivo==='activos'?'none':'1px solid var(--border)')+';background:'+(tabActivo==='activos'?'var(--accent)':'var(--bg-secondary)')+';color:'+(tabActivo==='activos'?'#fff':'var(--text-secondary)')+';cursor:pointer;">Activos ('+activos.length+')</button>';
+  html+='<button class="cuota-tab" data-tab="pagados" style="padding:7px 18px;font-size:13px;font-weight:500;border-radius:var(--radius);border:'+(tabActivo==='pagados'?'none':'1px solid var(--border)')+';background:'+(tabActivo==='pagados'?'var(--accent)':'var(--bg-secondary)')+';color:'+(tabActivo==='pagados'?'#fff':'var(--text-secondary)')+';cursor:pointer;">Pagados ('+pagados.length+')</button>';
+  html+='</div>';
+
+  if(lista.length===0){
+    html+='<p style="color:var(--text-secondary);">'+(tabActivo==='activos'?'No hay préstamos en cuotas activos.':'No hay préstamos en cuotas pagados.')+'</p>';
+    el.innerHTML=html;
+    el.querySelectorAll('.cuota-tab').forEach(function(b){b.onclick=function(){el._tab=b.getAttribute('data-tab');renderCuotas();};});
+    return;
+  }
+
+  lista.forEach(function(loan){
     var st=cuotaStatus(loan),sch=buildCuotaSchedule(loan),tot=cuotaTotals(loan);
     // Próximo vencimiento cuotas
     var proxInfoC='';
@@ -883,6 +900,7 @@ function renderCuotas(){
     html+='</tbody></table></div><div class="actions">'+(loan.estado!=='pagado'?'<button class="closecuota-btn" data-loan="'+loan.id+'">Cerrar préstamo</button>':'<button class="reopencuota-btn" data-loan="'+loan.id+'">Reabrir préstamo</button>')+'<button class="deletecuota-btn danger" data-loan="'+loan.id+'">Eliminar</button></div></div>';
   });
   el.innerHTML=html;
+  el.querySelectorAll('.cuota-tab').forEach(function(b){b.onclick=function(){el._tab=b.getAttribute('data-tab');renderCuotas();};});
   el.querySelectorAll('.paycuota-btn').forEach(function(btn){btn.onclick=function(){
     var l=cuotaLoans.find(function(x){return x.id===btn.getAttribute('data-loan');});
     if(!l)return;
