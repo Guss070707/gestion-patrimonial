@@ -120,6 +120,7 @@
     <button class="tab-btn" data-tab="caja">Caja interna</button>
     <button class="tab-btn" data-tab="nuevo">Nuevo a plazo</button>
     <button class="tab-btn" data-tab="nuevocuota">Nuevo en cuotas</button>
+    <button class="tab-btn" data-tab="notas">Notas</button>
   </div>
   <div id="content">
     <div id="status-banner"></div>
@@ -129,6 +130,7 @@
     <div id="view-cuotas" class="view"></div>
     <div id="view-historial" class="view"></div>
     <div id="view-analisis" class="view"></div>
+    <div id="view-notas" class="view"></div>
     <div id="view-caja" class="view"></div>
     <div id="view-patrimonio" class="view"></div>
     <div id="view-nuevo" class="view"></div>
@@ -209,6 +211,7 @@ var historialPrestamos = [];
 var patrimonioBolsas = [];
 var cajaInterna = {andrea:{junta:[],intereses:[]},gustavo:{junta:[],intereses:[]}};
 var cuotaLoans = [];
+var notas = [{id:'nota_general',titulo:'General',contenido:'',color:'#378ADD'}];
 var charts = {};
 
 // ── Sistema de Deshacer ──
@@ -290,6 +293,11 @@ async function savePatrimonio(){
   try{ await sbUpsertReal('prestamos',{id:'patrimonio_main',data:patrimonioBolsas,updated_at:new Date().toISOString()}); setSyncStatus('ok'); }
   catch(e){ setSyncStatus('error'); console.error(e); }
 }
+async function saveNotas(){
+  setSyncStatus('syncing');
+  try{ await sbUpsertReal('prestamos',{id:'notas_main',data:notas,updated_at:new Date().toISOString()}); setSyncStatus('ok'); }
+  catch(e){ setSyncStatus('error'); console.error(e); }
+}
 async function saveLoans(){
   setSyncStatus('syncing');
   try{
@@ -361,6 +369,14 @@ async function loadData(){
         await savePatrimonio();
       }
     }catch(e){ console.error('Error patrimonio',e); }
+
+    // Cargar notas
+    try{
+      var rn = await sbGet('prestamos?id=eq.notas_main');
+      if(rn[0]&&rn[0].data&&rn[0].data.length>0){
+        notas = rn[0].data;
+      }
+    }catch(e){ console.error('Error notas',e); }
 
   }catch(e){ console.error('Error cargando datos',e); document.getElementById('status-banner').textContent='Error conectando con la base de datos. Verifica tu conexión.'; document.getElementById('status-banner').style.display='block'; }
 }
@@ -1640,6 +1656,7 @@ function renderTab(t){
   else if(t==='caja')renderCajaInterna();
   else if(t==='prestamos')renderPrestamos();
   else if(t==='cuotas')renderCuotas();
+  else if(t==='notas')renderNotas();
   else if(t==='nuevo')renderNuevo();
   else if(t==='nuevocuota')renderNuevoCuota();
 }
@@ -1703,6 +1720,129 @@ async function restaurarDesdeBackup(){
       alert('✓ Datos restaurados. Efectivo: S/ 9,000');
     }catch(e){ setSyncStatus('error'); alert('Error: '+e.message); }
   }, 'Sí, restaurar', 'danger', 'Confirmar restauración');
+}
+
+// ============================================================
+// NOTAS
+// ============================================================
+var NOTA_COLORES=['#378ADD','#1D9E75','#EF9F27','#E24B4A','#8B5CF6','#EC4899','#64748b'];
+function renderNotas(){
+  var el=document.getElementById('view-notas');
+  if(!el) return;
+  var idActivo=el._notaActiva||(notas.length>0?notas[0].id:null);
+  el._notaActiva=idActivo;
+  var notaActual=notas.find(function(n){return n.id===idActivo;})||notas[0];
+
+  var html='<div style="display:flex;gap:16px;min-height:420px;">';
+
+  // Panel izquierdo — lista de categorías
+  html+='<div style="width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;">';
+  notas.forEach(function(n){
+    var activa=n.id===idActivo;
+    html+='<div class="nota-item" data-id="'+n.id+'" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius);cursor:pointer;background:'+(activa?'var(--bg-accent)':'var(--bg-secondary)')+';border:1px solid '+(activa?'var(--border-accent)':'var(--border)')+';">';
+    html+='<div style="width:10px;height:10px;border-radius:50%;background:'+n.color+';flex-shrink:0;"></div>';
+    html+='<span style="font-size:13px;font-weight:'+(activa?'500':'400')+';color:'+(activa?'var(--text-accent)':'var(--text-primary)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+n.titulo+'</span>';
+    html+='</div>';
+  });
+  html+='<button id="btn-nueva-nota" style="margin-top:4px;font-size:12px;padding:7px 12px;text-align:left;color:var(--text-secondary);">+ Nueva categoría</button>';
+  html+='</div>';
+
+  // Panel derecho — contenido de la nota activa
+  html+='<div style="flex:1;display:flex;flex-direction:column;gap:10px;">';
+  if(notaActual){
+    html+='<div style="display:flex;align-items:center;gap:10px;">';
+    html+='<input type="text" id="nota-titulo" value="'+notaActual.titulo+'" style="font-size:16px;font-weight:500;border:none;background:transparent;flex:1;padding:4px 0;border-bottom:1px solid var(--border);color:var(--text-primary);outline:none;" />';
+    // Selector de color
+    html+='<div style="display:flex;gap:5px;">';
+    NOTA_COLORES.forEach(function(c){
+      html+='<div class="nota-color" data-color="'+c+'" style="width:16px;height:16px;border-radius:50%;background:'+c+';cursor:pointer;border:2px solid '+(notaActual.color===c?'var(--text-primary)':'transparent')+';"></div>';
+    });
+    html+='</div>';
+    html+='<button id="btn-eliminar-nota" style="font-size:11px;padding:4px 10px;color:var(--text-danger);border-color:var(--border-danger);"'+(notas.length<=1?' disabled':'')+'>Eliminar</button>';
+    html+='</div>';
+    html+='<textarea id="nota-contenido" style="flex:1;min-height:340px;font-size:13px;line-height:1.7;resize:none;padding:12px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);" placeholder="Escribe aquí tus notas sobre esta categoría...">'+notaActual.contenido+'</textarea>';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;">';
+    html+='<span id="nota-guardado" style="font-size:11px;color:var(--text-secondary);"></span>';
+    html+='<button id="btn-guardar-nota" class="primary" style="padding:7px 20px;">Guardar</button>';
+    html+='</div>';
+  }
+  html+='</div></div>';
+
+  el.innerHTML=html;
+
+  // Binds
+  el.querySelectorAll('.nota-item').forEach(function(item){
+    item.onclick=function(){
+      // Guardar contenido actual antes de cambiar
+      var ta=document.getElementById('nota-contenido');
+      var tit=document.getElementById('nota-titulo');
+      if(ta&&notaActual){notaActual.contenido=ta.value; notaActual.titulo=tit.value||notaActual.titulo;}
+      el._notaActiva=item.getAttribute('data-id');
+      renderNotas();
+    };
+  });
+
+  el.querySelectorAll('.nota-color').forEach(function(dot){
+    dot.onclick=function(){
+      if(notaActual) notaActual.color=dot.getAttribute('data-color');
+      renderNotas();
+    };
+  });
+
+  var btnGuardar=document.getElementById('btn-guardar-nota');
+  if(btnGuardar) btnGuardar.onclick=async function(){
+    if(notaActual){
+      var ta=document.getElementById('nota-contenido');
+      var tit=document.getElementById('nota-titulo');
+      notaActual.contenido=ta?ta.value:'';
+      notaActual.titulo=tit?(tit.value||notaActual.titulo):notaActual.titulo;
+    }
+    await saveNotas();
+    var sp=document.getElementById('nota-guardado');
+    if(sp){sp.textContent='✓ Guardado';setTimeout(function(){if(sp)sp.textContent='';},2000);}
+    renderNotas();
+  };
+
+  var btnNueva=document.getElementById('btn-nueva-nota');
+  if(btnNueva) btnNueva.onclick=async function(){
+    var nuevaId='nota_'+Date.now();
+    notas.push({id:nuevaId,titulo:'Nueva nota',contenido:'',color:NOTA_COLORES[notas.length%NOTA_COLORES.length]});
+    el._notaActiva=nuevaId;
+    await saveNotas();
+    renderNotas();
+  };
+
+  var btnEliminar=document.getElementById('btn-eliminar-nota');
+  if(btnEliminar) btnEliminar.onclick=function(){
+    if(notas.length<=1) return;
+    showConfirmModal('¿Eliminar la categoría <b>'+(notaActual?notaActual.titulo:'')+'</b> y su contenido?',async function(){
+      notas=notas.filter(function(n){return n.id!==idActivo;});
+      el._notaActiva=notas[0]?notas[0].id:null;
+      await saveNotas();
+      renderNotas();
+    },'Sí, eliminar','danger','Confirmar eliminación');
+  };
+
+  // Auto-guardado al escribir (cada 3s de inactividad)
+  var ta=document.getElementById('nota-contenido');
+  var tit=document.getElementById('nota-titulo');
+  var autoSaveTimer=null;
+  function triggerAutoSave(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer=setTimeout(async function(){
+      if(notaActual){
+        var t=document.getElementById('nota-contenido');
+        var tt=document.getElementById('nota-titulo');
+        if(t) notaActual.contenido=t.value;
+        if(tt) notaActual.titulo=tt.value||notaActual.titulo;
+        await saveNotas();
+        var sp=document.getElementById('nota-guardado');
+        if(sp){sp.textContent='✓ Guardado automáticamente';setTimeout(function(){if(sp)sp.textContent='';},2000);}
+      }
+    },3000);
+  }
+  if(ta) ta.oninput=triggerAutoSave;
+  if(tit) tit.oninput=triggerAutoSave;
 }
 
 async function init(){
