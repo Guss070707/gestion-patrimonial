@@ -1554,8 +1554,8 @@ function renderCajaInterna(){
   el._persona=persona;
 
   var data=cajaInterna[persona];
-  var totalJunta=(data.saldo_junta||0)+(data.saldo_inicial_junta||0);
-  var totalIntereses=(data.saldo_intereses||0)+(data.saldo_inicial_intereses||0);
+  var totalJunta=(data.saldo_junta||0);
+  var totalIntereses=(data.saldo_intereses||0);
   var totalDeuda=totalJunta+totalIntereses;
 
   var tabs=['andrea','gustavo'];
