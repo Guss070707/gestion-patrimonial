@@ -4,7 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Gestión Patrimonial — G&A</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#1e2130" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Patrimonio G&A" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <style>
   :root {
     --bg:#0f1117; --bg-secondary:#1a1d27; --bg-card:#1e2130; --border:#2e3349;
@@ -20,7 +29,24 @@
   .login-box p{font-size:13px;color:var(--text-secondary);margin-bottom:24px;}
   .login-box input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;margin-bottom:12px;text-align:center;letter-spacing:2px;}
   .login-box button{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;}
-  .login-box .error{color:var(--text-danger);font-size:13px;margin-top:8px;display:none;}
+  .login-box .error{color:var(--text-danger);font-size:13px;margin-top:8px;min-height:18px;}
+  .user-pick{display:flex;gap:8px;justify-content:center;margin-bottom:18px;}
+  .user-pick button{width:auto;flex:1;background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border);font-weight:500;padding:9px;}
+  .user-pick button.sel{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .pin-dots{display:flex;gap:12px;justify-content:center;margin:6px 0 14px;}
+  .pin-dots span{width:14px;height:14px;border-radius:50%;border:2px solid var(--text-secondary);}
+  .pin-dots span.on{background:var(--accent);border-color:var(--accent);}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .pin-pad button{background:var(--bg-secondary);color:var(--text);border:1px solid var(--border);font-size:22px;font-weight:500;padding:14px 0;}
+  .pin-pad button:active{background:var(--border);}
+  .pin-pad button.pad-aux{font-size:15px;color:var(--text-secondary);}
+  #huella-btn{background:transparent;border:1px solid var(--accent);color:var(--accent);margin-bottom:14px;display:none;}
+  body.locked #modal-overlay, body.locked #alerta-banner, body.locked #backup-banner, body.locked #huella-aviso{display:none!important;}
+  .login-box.busy{opacity:.6;pointer-events:none;}
+  .aj-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:14px;max-width:560px;}
+  .aj-card h3{font-size:15px;margin-bottom:10px;}
+  .aj-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 12px;font-size:14px;padding:6px 0;}
+  .aj-row .muted{color:var(--text-secondary);font-size:13px;}
   #main-app{display:none;}
   #header{background:var(--bg-card);border-bottom:1px solid var(--border);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;}
   #header h1{font-size:17px;font-weight:600;}
@@ -92,10 +118,12 @@
 <div id="login-screen">
   <div class="login-box">
     <h2>💼 Gestión Patrimonial G&A</h2>
-    <p>Ingresa la contraseña para acceder</p>
-    <input type="password" id="login-input" placeholder="Contraseña" />
-    <button onclick="checkLogin()">Ingresar</button>
-    <div class="error" id="login-error">Contraseña incorrecta</div>
+    <p id="login-sub">Elige tu usuario e ingresa tu PIN</p>
+    <div class="user-pick" id="user-pick"></div>
+    <button id="huella-btn" onclick="entrarConHuella()">🔒 Entrar con huella</button>
+    <div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="pin-pad" id="pin-pad"></div>
+    <div class="error" id="login-error"></div>
   </div>
 </div>
 
@@ -105,6 +133,7 @@
     <h1>📊 Gestión Patrimonial — G&A</h1>
     <div id="header-right">
       <span id="today-date"></span>
+      <span id="user-label"></span>
       <button id="undo-btn" onclick="undoAccion()" style="font-size:11px;padding:3px 10px;opacity:0.3;cursor:not-allowed;" title="Deshacer última acción" disabled>↩ Deshacer</button>
       <button onclick="descargarBackup()" style="font-size:11px;padding:3px 10px;opacity:0.6;" title="Descargar backup">💾 Backup</button>
       
@@ -120,6 +149,7 @@
     <button class="tab-btn" data-tab="patrimonio">Patrimonio</button>
     <button class="tab-btn" data-tab="caja">Caja interna</button>
     <button class="tab-btn" data-tab="notas">Notas</button>
+    <button class="tab-btn" data-tab="ajustes">⚙️ Ajustes</button>
   </div>
   <div id="content">
     <div id="status-banner"></div>
@@ -132,6 +162,7 @@
     <div id="view-notas" class="view"></div>
     <div id="view-caja" class="view"></div>
     <div id="view-patrimonio" class="view"></div>
+    <div id="view-ajustes" class="view"></div>
   </div>
 </div>
 
@@ -145,37 +176,298 @@
 // ============================================================
 var SUPABASE_URL = 'https://mwctglaiehoksisptnbr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13Y3RnbGFpZWhva3Npc3B0bmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDcyNTMsImV4cCI6MjA5NzM4MzI1M30.xr7y1RqCzVQ5GL9oObvJDkjiHfZhWUJfpI5DTTZtLMA';
-var APP_PASSWORD = 'GA2000';
 var SEED_KEY = 'prestamos:seeded_v4';
 var HISTORIAL_SEED_DONE = false;
+var APP_VERSION = '2026.11.06-1';
 
 // ============================================================
-// LOGIN
+// ACCESO: PIN (Supabase Auth) + HUELLA (WebAuthn) + BLOQUEO
 // ============================================================
-function checkLogin(){
-  var val = document.getElementById('login-input').value;
-  if(val === APP_PASSWORD){
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('main-app').style.display = 'block';
-    sessionStorage.setItem('auth','1');
-    init();
-  } else {
-    document.getElementById('login-error').style.display = 'block';
+// El PIN de 6 dígitos es la contraseña real del usuario en Supabase Auth.
+var USUARIOS = [
+  {nombre:'Gustavo', email:'gustavodolorier77@gmail.com'},
+  {nombre:'Andrea',  email:'arrietasalinasandrea@gmail.com'}
+];
+var BLOQUEO_MS = 5*60*1000;      // 5 minutos fuera de la app
+var sb = null;
+try{
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storageKey:'gp-auth'}
+  });
+}catch(e){ console.error('No cargó supabase-js', e); }
+
+var _pin = '';
+var _usuarioSel = null;
+var _appIniciada = false;
+var _desbloqueada = false;
+var _ocultaDesde = null;
+var _huellaEnCurso = false;
+var _soloLectura = false;   // se activa si la base no devuelve datos: bloquea toda escritura
+
+function usuarioPorEmail(email){ email=(email||'').toLowerCase(); return USUARIOS.find(function(u){return u.email.toLowerCase()===email;})||null; }
+function keyHuella(email){ return 'gp-huella:'+email.toLowerCase(); }
+function keyHuellaNo(email){ return 'gp-huella-no:'+email.toLowerCase(); }
+function lsGet(k){ try{return localStorage.getItem(k);}catch(e){return null;} }
+function lsSet(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+function lsDel(k){ try{localStorage.removeItem(k);}catch(e){} }
+
+function loginError(msg){ document.getElementById('login-error').textContent = msg||''; }
+function loginBusy(b){ document.querySelector('.login-box').classList.toggle('busy', !!b); }
+
+function pintarLogin(){
+  var pick = document.getElementById('user-pick');
+  pick.innerHTML = USUARIOS.map(function(u){
+    return '<button type="button" class="'+(_usuarioSel===u?'sel':'')+'" data-email="'+u.email+'">'+u.nombre+'</button>';
+  }).join('');
+  pick.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){ _usuarioSel = usuarioPorEmail(b.getAttribute('data-email')); lsSet('gp-ultimo-usuario', _usuarioSel.email); _pin=''; loginError(''); pintarLogin(); };
+  });
+  var dots = document.querySelectorAll('#pin-dots span');
+  dots.forEach(function(d,i){ d.classList.toggle('on', i<_pin.length); });
+  document.getElementById('huella-btn').style.display = (_usuarioSel && lsGet(keyHuella(_usuarioSel.email))) ? 'block' : 'none';
+}
+function armarTeclado(){
+  var keys = ['1','2','3','4','5','6','7','8','9','borrar','0','ok'];
+  var pad = document.getElementById('pin-pad');
+  pad.innerHTML = keys.map(function(k){
+    if(k==='borrar') return '<button type="button" class="pad-aux" data-k="borrar">⌫</button>';
+    if(k==='ok') return '<button type="button" class="pad-aux" data-k="ok">Entrar</button>';
+    return '<button type="button" data-k="'+k+'">'+k+'</button>';
+  }).join('');
+  pad.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ teclaPin(b.getAttribute('data-k')); }; });
+}
+function teclaPin(k){
+  if(!_usuarioSel){ loginError('Primero elige tu usuario'); return; }
+  loginError('');
+  if(k==='borrar'){ _pin=_pin.slice(0,-1); }
+  else if(k==='ok'){ if(_pin.length===6) entrarConPin(); else loginError('El PIN tiene 6 dígitos'); }
+  else if(_pin.length<6){ _pin+=k; }
+  pintarLogin();
+  if(k!=='ok' && k!=='borrar' && _pin.length===6) entrarConPin();
+}
+document.addEventListener('keydown', function(e){
+  if(_desbloqueada) return;
+  if(document.getElementById('login-screen').style.display==='none') return;
+  if(/^[0-9]$/.test(e.key)) teclaPin(e.key);
+  else if(e.key==='Backspace') teclaPin('borrar');
+  else if(e.key==='Enter') teclaPin('ok');
+});
+
+async function entrarConPin(){
+  if(!sb){ loginError('Sin conexión: no se pudo cargar el sistema de acceso.'); return; }
+  var pin = _pin, u = _usuarioSel;
+  loginBusy(true);
+  try{
+    var r = await sb.auth.signInWithPassword({email:u.email, password:pin});
+    if(r.error) throw r.error;
+    _pin=''; pintarLogin();
+    await desbloquear();
+    setTimeout(ofrecerHuella, 900);
+  }catch(e){
+    _pin=''; pintarLogin();
+    var m = (e && e.message) || '';
+    if(/invalid login|invalid credentials/i.test(m)) loginError('PIN incorrecto');
+    else if(/rate|too many/i.test(m)) loginError('Demasiados intentos. Espera unos minutos.');
+    else if(/fetch|network/i.test(m)) loginError('Sin conexión a internet');
+    else loginError('No se pudo entrar: '+m);
+  }finally{ loginBusy(false); }
+}
+
+async function sesionValida(){
+  if(!sb) return null;
+  var s = (await sb.auth.getSession()).data.session;
+  if(!s) return null;
+  var r = await sb.auth.refreshSession();
+  if(r.error || !r.data || !r.data.session) return null;
+  return r.data.session;
+}
+
+async function desbloquear(){
+  var s = (await sb.auth.getSession()).data.session;
+  var u = s ? usuarioPorEmail(s.user.email) : null;
+  document.getElementById('user-label').textContent = u ? ('👤 '+u.nombre) : '';
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.body.classList.remove('locked');
+  _desbloqueada = true; _ocultaDesde = null;
+  if(!_appIniciada){ _appIniciada = true; await init(); }
+  if(document.getElementById('view-ajustes').classList.contains('active')) renderAjustes();
+}
+
+function bloquear(autoHuella){
+  _desbloqueada = false; _pin = '';
+  document.body.classList.add('locked');   // oculta ventanas abiertas sin perder lo que estabas llenando
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-sub').textContent = _appIniciada ? 'App bloqueada — ingresa de nuevo' : 'Elige tu usuario e ingresa tu PIN';
+  loginError(''); pintarLogin();
+  if(autoHuella && _usuarioSel && lsGet(keyHuella(_usuarioSel.email))) setTimeout(entrarConHuella, 300);
+}
+
+// Bloqueo tras 5 minutos fuera de la app
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='hidden'){ if(_desbloqueada) _ocultaDesde = Date.now(); }
+  else if(_desbloqueada && _ocultaDesde && (Date.now()-_ocultaDesde) >= BLOQUEO_MS){ bloquear(true); }
+});
+
+async function cerrarSesion(){
+  if(!confirm('¿Cerrar sesión? La próxima vez tendrás que entrar con tu PIN.')) return;
+  try{ if(sb) await sb.auth.signOut(); }catch(e){ console.error(e); }
+  try{ localStorage.removeItem('gp-auth'); }catch(e){}
+  location.reload();
+}
+
+// ---------- HUELLA (WebAuthn) ----------
+function b64url(buf){ var s='', b=new Uint8Array(buf); for(var i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function deB64url(str){ str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='='; var bin=atob(str), b=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) b[i]=bin.charCodeAt(i); return b.buffer; }
+function retoAleatorio(){ var a=new Uint8Array(32); crypto.getRandomValues(a); return a; }
+
+async function huellaDisponible(){
+  try{
+    return !!(window.isSecureContext && window.PublicKeyCredential &&
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
+      await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  }catch(e){ return false; }
+}
+
+async function usuarioSesion(){
+  if(!sb) return null;
+  var s = (await sb.auth.getSession()).data.session;
+  return s ? usuarioPorEmail(s.user.email) : null;
+}
+
+async function activarHuella(){
+  var u = await usuarioSesion();
+  if(!u){ alert('Primero entra con tu PIN.'); return false; }
+  if(!(await huellaDisponible())){ alert('Este dispositivo o navegador no permite usar huella.'); return false; }
+  try{
+    var cred = await navigator.credentials.create({publicKey:{
+      challenge: retoAleatorio(),
+      rp: {name:'Gestión Patrimonial G&A'},
+      user: {id: new TextEncoder().encode(u.email), name: u.email, displayName: u.nombre},
+      pubKeyCredParams: [{type:'public-key', alg:-7}, {type:'public-key', alg:-257}],
+      authenticatorSelection: {authenticatorAttachment:'platform', userVerification:'required', residentKey:'discouraged', requireResidentKey:false},
+      timeout: 60000,
+      attestation: 'none'
+    }});
+    if(!cred) return false;
+    lsSet(keyHuella(u.email), b64url(cred.rawId));
+    lsDel(keyHuellaNo(u.email));
+    return true;
+  }catch(e){
+    console.error('Huella create', e);
+    if(e && e.name!=='NotAllowedError') alert('No se pudo activar la huella: '+(e.message||e.name));
+    return false;
   }
 }
-document.getElementById('login-input').addEventListener('keydown', function(e){ if(e.key==='Enter') checkLogin(); });
-if(sessionStorage.getItem('auth')==='1'){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('main-app').style.display='block';
+
+async function quitarHuella(){
+  var u = await usuarioSesion(); if(!u) return;
+  lsDel(keyHuella(u.email));
+  lsSet(keyHuellaNo(u.email), '1');
+}
+
+async function entrarConHuella(){
+  if(_huellaEnCurso || _desbloqueada) return;
+  var u = _usuarioSel; if(!u) return;
+  var id = lsGet(keyHuella(u.email));
+  if(!id){ pintarLogin(); return; }
+  _huellaEnCurso = true; loginError('');
+  try{
+    var a = await navigator.credentials.get({publicKey:{
+      challenge: retoAleatorio(),
+      allowCredentials: [{type:'public-key', id: deB64url(id), transports:['internal']}],
+      userVerification: 'required',
+      timeout: 60000
+    }});
+    if(!a) throw new Error('cancelada');
+    loginBusy(true);
+    var s = await sesionValida();
+    if(!s || !usuarioPorEmail(s.user.email) || s.user.email.toLowerCase()!==u.email.toLowerCase()){
+      loginError('Tu sesión venció. Ingresa tu PIN.');
+      return;
+    }
+    await desbloquear();
+  }catch(e){
+    console.warn('Huella', e);
+    loginError(e && e.name==='NotAllowedError' ? 'Huella cancelada. Usa tu PIN o vuelve a intentar.' : 'No se pudo usar la huella. Ingresa tu PIN.');
+  }finally{ _huellaEnCurso=false; loginBusy(false); }
+}
+
+async function ofrecerHuella(){
+  var u = await usuarioSesion(); if(!u) return;
+  if(lsGet(keyHuella(u.email)) || lsGet(keyHuellaNo(u.email))) return;
+  if(!(await huellaDisponible())) return;
+  if(document.getElementById('huella-aviso')) return;
+  var html='<div id="huella-aviso" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1001;width:min(92vw,360px);background:var(--bg-card);border:1px solid var(--accent);border-radius:var(--radius);padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.5);">'+
+    '<div style="font-weight:600;margin-bottom:6px;">🔒 ¿Entrar con huella?</div>'+
+    '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">La próxima vez podrás abrir la app con tu huella en este teléfono, sin escribir el PIN.</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button id="huella-no" style="padding:7px 14px;">Ahora no</button><button id="huella-si" style="padding:7px 14px;background:var(--accent);color:#fff;border:none;">Activar</button></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('huella-no').onclick=function(){ lsSet(keyHuellaNo(u.email),'1'); document.getElementById('huella-aviso').remove(); };
+  document.getElementById('huella-si').onclick=async function(){ document.getElementById('huella-aviso').remove(); var ok=await activarHuella(); if(ok) alert('Huella activada en este dispositivo ✅'); renderAjustes(); };
+}
+
+// ---------- AJUSTES ----------
+async function renderAjustes(){
+  var el = document.getElementById('view-ajustes'); if(!el) return;
+  var u = await usuarioSesion();
+  var disp = await huellaDisponible();
+  var activa = u && lsGet(keyHuella(u.email));
+  var instalada = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  var h='';
+  h+='<div class="aj-card"><h3>👤 Cuenta</h3>';
+  h+='<div class="aj-row"><span>Usuario</span><span>'+(u?u.nombre:'—')+' <span class="muted">'+(u?u.email:'')+'</span></span></div>';
+  h+='<div class="aj-row"><span>Bloqueo automático</span><span class="muted">tras 5 min fuera de la app</span></div>';
+  h+='<div class="aj-row"><button onclick="bloquear(true)" style="padding:7px 14px;">🔒 Bloquear ahora</button><button onclick="cerrarSesion()" style="padding:7px 14px;color:var(--text-danger);border-color:var(--text-danger);">Cerrar sesión</button></div></div>';
+  h+='<div class="aj-card"><h3>🔒 Huella en este dispositivo</h3>';
+  if(!disp){
+    h+='<div class="aj-row"><span class="muted">'+(window.isSecureContext?'Este dispositivo o navegador no tiene huella disponible.':'La huella solo funciona en la página publicada (https).')+'</span></div>';
+  }else if(activa){
+    h+='<div class="aj-row"><span>Estado</span><span style="color:var(--text-success);">Activada</span></div>';
+    h+='<div class="aj-row"><span class="muted">La huella solo desbloquea la sesión guardada en este teléfono; nunca sale de él.</span><button id="aj-quitar" style="padding:7px 14px;">Quitar</button></div>';
+  }else{
+    h+='<div class="aj-row"><span>Estado</span><span class="muted">Desactivada</span></div>';
+    h+='<div class="aj-row"><span class="muted">Entra con tu huella en vez del PIN.</span><button id="aj-activar" style="padding:7px 14px;background:var(--accent);color:#fff;border:none;">Activar</button></div>';
+  }
+  h+='</div>';
+  h+='<div class="aj-card"><h3>📱 App</h3>';
+  h+='<div class="aj-row"><span>Versión</span><span class="muted">'+APP_VERSION+'</span></div>';
+  h+='<div class="aj-row"><span>Instalada como app</span><span class="muted">'+(instalada?'Sí':'No (Chrome → ⋮ → Instalar app)')+'</span></div></div>';
+  el.innerHTML = h;
+  var bA=document.getElementById('aj-activar'); if(bA) bA.onclick=async function(){ var ok=await activarHuella(); if(ok) alert('Huella activada en este dispositivo ✅'); renderAjustes(); };
+  var bQ=document.getElementById('aj-quitar'); if(bQ) bQ.onclick=async function(){ if(!confirm('¿Quitar la huella en este dispositivo?')) return; await quitarHuella(); renderAjustes(); };
+}
+
+// ---------- ARRANQUE ----------
+async function arrancar(){
+  armarTeclado();
+  var s = null;
+  try{ if(sb) s = (await sb.auth.getSession()).data.session; }catch(e){}
+  var ultimo = lsGet('gp-ultimo-usuario');
+  _usuarioSel = (s && usuarioPorEmail(s.user.email)) || usuarioPorEmail(ultimo) || null;
+  if(!sb) loginError('Sin conexión: no se pudo cargar el sistema de acceso. Revisa tu internet y recarga.');
+  bloquear(!!s);
+}
+
+// ---------- APP INSTALABLE (service worker) ----------
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW', e); }); });
 }
 
 // ============================================================
 // SUPABASE API
 // ============================================================
+async function sbHeaders(prefer){
+  var s = sb ? (await sb.auth.getSession()).data.session : null;
+  if(!s){ bloquear(false); throw new Error('Sesión vencida: ingresa tu PIN'); }
+  return {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+s.access_token,'Prefer':prefer};
+}
 async function sbFetch(path, method, body){
+  if(_soloLectura && method && method!=='GET') throw new Error('Guardado bloqueado: los datos no cargaron bien. Recarga la app.');
   var opts = {
     method: method||'GET',
-    headers: {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=representation'}
+    headers: await sbHeaders('return=representation')
   };
   if(body) opts.body = JSON.stringify(body);
   var res = await fetch(SUPABASE_URL+'/rest/v1/'+path, opts);
@@ -189,9 +481,10 @@ async function sbGet(table){
 }
 async function sbUpsert(table, row){ return sbFetch(table,'POST',[row]); }  // with Prefer:resolution=merge-duplicates handled via headers below
 async function sbUpsertReal(table, row){
+  if(_soloLectura) throw new Error('Guardado bloqueado: los datos no cargaron bien. Recarga la app.');
   var opts = {
     method:'POST',
-    headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'resolution=merge-duplicates,return=representation'}
+    headers: await sbHeaders('resolution=merge-duplicates,return=representation')
   };
   opts.body = JSON.stringify([row]);
   var res = await fetch(SUPABASE_URL+'/rest/v1/'+table, opts);
@@ -315,10 +608,15 @@ function seedHistorial(){
 
 async function loadData(){
   try{
-    var r1 = await sbGet('prestamos?id=eq.main'); loans = (r1[0]&&r1[0].data) ? r1[0].data : [];
-    var r2 = await sbGet('cuotas_prestamos?id=eq.main'); cuotaLoans = (r2[0]&&r2[0].data) ? r2[0].data : [];
-    var seeded = loans.length > 0;
-    if(!seeded){ loans=seedData(); cuotaLoans=seedCuotaData(); await saveLoans(); await saveCuotaLoans(); }
+    var r1 = await sbGet('prestamos?id=eq.main');
+    var r2 = await sbGet('cuotas_prestamos?id=eq.main');
+    // Protección: si la base no devuelve la fila principal (sin permiso o vacía), NO escribir nada encima.
+    if(!r1[0] || !Array.isArray(r1[0].data)){
+      _soloLectura = true;
+      throw new Error('La base no devolvió tus préstamos (¿permiso o conexión?). No se guardará nada hasta resolverlo.');
+    }
+    loans = r1[0].data;
+    cuotaLoans = (r2[0]&&r2[0].data) ? r2[0].data : [];
     // migracion
     var mig=false;
     loans.forEach(function(l){
@@ -389,7 +687,7 @@ async function loadData(){
       }
     }catch(e){ console.error('Error notas',e); }
 
-  }catch(e){ console.error('Error cargando datos',e); document.getElementById('status-banner').textContent='Error conectando con la base de datos. Verifica tu conexión.'; document.getElementById('status-banner').style.display='block'; }
+  }catch(e){ console.error('Error cargando datos',e); document.getElementById('status-banner').textContent=(_soloLectura?'⚠️ '+e.message:'Error conectando con la base de datos. Verifica tu conexión.'); document.getElementById('status-banner').style.display='block'; }
 }
 
 // ============================================================
@@ -1775,6 +2073,7 @@ function renderTab(t){
   else if(t==='prestamos')renderPrestamos();
   else if(t==='cuotas')renderCuotas();
   else if(t==='notas')renderNotas();
+  else if(t==='ajustes')renderAjustes();
 }
 function refresh(){ ['dashboard','historial','analisis','patrimonio','prestamos','cuotas'].forEach(function(t){renderTab(t);}); }
 
@@ -2000,7 +2299,7 @@ async function init(){
   }, 800);
 }
 
-if(sessionStorage.getItem('auth')==='1') init();
+arrancar();
 </script>
 </body>
 </html>
