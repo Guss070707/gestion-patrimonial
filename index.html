@@ -65,7 +65,7 @@
   .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px;}
   .metric-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
   .metric-card .label{font-size:13px;color:var(--text-secondary);margin-bottom:6px;}
-  .metric-card .value{font-size:28px;font-weight:600;}
+  .metric-card .value{font-size:clamp(20px,2.4vw,28px);font-weight:600;white-space:nowrap;}
   .chart-wrap{position:relative;width:100%;margin-bottom:28px;}
   .chart-title{font-size:14px;font-weight:500;color:var(--text-secondary);margin-bottom:10px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -178,7 +178,7 @@ var SUPABASE_URL = 'https://mwctglaiehoksisptnbr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13Y3RnbGFpZWhva3Npc3B0bmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDcyNTMsImV4cCI6MjA5NzM4MzI1M30.xr7y1RqCzVQ5GL9oObvJDkjiHfZhWUJfpI5DTTZtLMA';
 var SEED_KEY = 'prestamos:seeded_v4';
 var HISTORIAL_SEED_DONE = false;
-var APP_VERSION = '2026.11.10-1';
+var APP_VERSION = '2026.11.10-2';
 
 // ============================================================
 // ACCESO: PIN (Supabase Auth) + HUELLA (WebAuthn) + BLOQUEO
@@ -1887,9 +1887,9 @@ function renderPatrimonio(){
   var html='<div class="metric-grid">';
   html+=metricCard('Patrimonio total G&A',fmtMoney(totalPatrimonio));
   html+=metricCard('Capital en préstamos',fmtMoney(totalPrest));
-  html+=metricCard('Efectivo e inversiones',fmtMoney(bolsas.filter(function(b){return b.monto>0&&b.tipo!=='terreno';}).reduce(function(a,b){return a+b.monto;},0)));
-  if(bolsas.some(function(b){return b.tipo==='terreno';})) html+=metricCard('Terreno (inversión)',fmtMoney(totalTerreno));
-  html+=metricCard('Deudas internas',fmtMoney(Math.abs(bolsas.filter(function(b){return b.monto<0;}).reduce(function(a,b){return a+b.monto;},0))));
+  var _ef=getEfectivo();
+  html+=metricCard('Efectivo disponible',fmtMoney(_ef?_ef.monto:0));
+  if(bolsas.some(function(b){return b.tipo==='terreno';})) html+=metricCard('Terreno',fmtMoney(totalTerreno));
   html+='</div>';
 
   html+='<div class="card"><div class="section-title">Distribución del capital</div>';
@@ -2045,11 +2045,10 @@ function renderTerreno(el){
   var gastoMes=t.terreno.movimientos.filter(function(m){return m.tipo==='gasto'&&m.categoria!=='Compra'&&m.fecha.slice(0,7)===mesActual;}).reduce(function(a,m){return a+m.monto;},0);
 
   var h='<div class="metric-grid">';
-  h+=metricCard('Inversión total en el terreno',fmtMoney(tot.neto));
+  h+=metricCard('Inversión total',fmtMoney(tot.neto));
   h+=metricCard('Compra',fmtMoney(tot.compra));
-  h+=metricCard('Gastos después de la compra',fmtMoney(tot.posteriores));
+  h+=metricCard('Gastos adicionales',fmtMoney(tot.posteriores));
   h+=metricCard('Ingresos',fmtMoney(tot.ingresos));
-  h+=metricCard('Gastos de este mes',fmtMoney(gastoMes));
   h+='</div>';
 
   // Datos + ubicación
