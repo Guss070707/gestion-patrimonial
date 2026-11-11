@@ -178,7 +178,7 @@ var SUPABASE_URL = 'https://mwctglaiehoksisptnbr.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13Y3RnbGFpZWhva3Npc3B0bmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDcyNTMsImV4cCI6MjA5NzM4MzI1M30.xr7y1RqCzVQ5GL9oObvJDkjiHfZhWUJfpI5DTTZtLMA';
 var SEED_KEY = 'prestamos:seeded_v4';
 var HISTORIAL_SEED_DONE = false;
-var APP_VERSION = '2026.11.06-1';
+var APP_VERSION = '2026.11.10-1';
 
 // ============================================================
 // ACCESO: PIN (Supabase Auth) + HUELLA (WebAuthn) + BLOQUEO
@@ -1863,8 +1863,14 @@ function renderAnalisis(){
 // PATRIMONIO
 // ============================================================
 function renderPatrimonio(){
-  var el=document.getElementById('view-patrimonio');
-  if(!el) return;
+  var host=document.getElementById('view-patrimonio');
+  if(!host) return;
+  var sub=host._tab||'resumen'; host._tab=sub;
+  var _t=getTerreno();
+  host.innerHTML='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">'+btnSub('resumen','Resumen',sub==='resumen')+btnSub('terreno','🏡 Terreno'+(_t?'':' (nuevo)'),sub==='terreno')+'</div><div id="patri-body"></div>';
+  host.querySelectorAll('.patri-tab').forEach(function(b){ b.onclick=function(){ host._tab=b.getAttribute('data-tab'); renderPatrimonio(); }; });
+  var el=document.getElementById('patri-body');
+  if(sub==='terreno'){ destroyChart('patrimonio'); renderTerreno(el); return; }
 
   var capPrest=loans.filter(function(l){return l.estado!=='pagado';}).reduce(function(a,l){return a+saldoActualDe(l);},0);
   var capCuotas=cuotaLoans.filter(function(l){return l.estado!=='pagado';}).reduce(function(a,l){var sc=buildCuotaSchedule(l),p=sc.find(function(s){return !s.pagado;});return a+(p?p.saldoAntes:0);},0);
@@ -1874,13 +1880,15 @@ function renderPatrimonio(){
   var totalBolsas=bolsas.reduce(function(a,b){return a+b.monto;},0);
   var totalPatrimonio=totalPrest+Math.max(0,totalBolsas);
 
-  var iconos={efectivo:'💵',inversion:'📈',otro:'🔧'};
-  var colores={efectivo:'#378ADD',inversion:'#1D9E75',otro:'#EF9F27'};
+  var iconos={efectivo:'💵',inversion:'📈',otro:'🔧',terreno:'🏡'};
+  var colores={efectivo:'#378ADD',inversion:'#1D9E75',otro:'#EF9F27',terreno:'#a16207'};
+  var totalTerreno=bolsas.filter(function(b){return b.tipo==='terreno';}).reduce(function(a,b){return a+b.monto;},0);
 
   var html='<div class="metric-grid">';
   html+=metricCard('Patrimonio total G&A',fmtMoney(totalPatrimonio));
   html+=metricCard('Capital en préstamos',fmtMoney(totalPrest));
-  html+=metricCard('Efectivo e inversiones',fmtMoney(bolsas.filter(function(b){return b.monto>0;}).reduce(function(a,b){return a+b.monto;},0)));
+  html+=metricCard('Efectivo e inversiones',fmtMoney(bolsas.filter(function(b){return b.monto>0&&b.tipo!=='terreno';}).reduce(function(a,b){return a+b.monto;},0)));
+  if(bolsas.some(function(b){return b.tipo==='terreno';})) html+=metricCard('Terreno (inversión)',fmtMoney(totalTerreno));
   html+=metricCard('Deudas internas',fmtMoney(Math.abs(bolsas.filter(function(b){return b.monto<0;}).reduce(function(a,b){return a+b.monto;},0))));
   html+='</div>';
 
@@ -1898,8 +1906,11 @@ function renderPatrimonio(){
     if(b.monto>0) html+='<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">'+bpct+'% del patrimonio</div>';
     if(b.notas) html+='<div style="font-size:11px;color:var(--text-secondary);">'+b.notas+'</div>';
     html+='</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:17px;font-weight:600;color:'+(b.monto<0?'var(--text-danger)':'')+'">'+fmtMoney(b.monto)+'</span>';
+    if(b.tipo==='terreno') html+='<button class="ver-terreno-btn" style="font-size:11px;padding:3px 8px;">Ver detalle</button>';
+    else{
     html+='<button class="edit-bolsa-btn" data-id="'+b.id+'" style="font-size:11px;padding:3px 8px;">Editar</button>';
     html+='<button class="del-bolsa-btn" data-id="'+b.id+'" style="font-size:11px;padding:3px 8px;color:var(--text-danger);border-color:#fca5a5;background:var(--bg-danger);">✕</button>';
+    }
     html+='</div></div>';
   });
 
@@ -1951,8 +1962,399 @@ function renderPatrimonio(){
     };
   });
   document.getElementById('add-bolsa-btn').onclick=function(){openBolsaModal(null);};
+  el.querySelectorAll('.ver-terreno-btn').forEach(function(btn){ btn.onclick=function(){ host._tab='terreno'; renderPatrimonio(); }; });
 }
 
+
+// ============================================================
+// TERRENO (sub-pestaña de Patrimonio)
+// ============================================================
+// El terreno vive como una bolsa más de patrimonio (tipo 'terreno').
+// Su monto = todos los gastos (incluida la compra) − ingresos.
+// Cada movimiento con "afectaCaja" mueve el mismo monto en Efectivo disponible (bol_1),
+// así el patrimonio total no cambia al gastar: el dinero solo pasa de efectivo a terreno.
+var TERRENO_BUCKET = 'terreno-docs';
+var TERRENO_MAX_MB = 20;
+var TERRENO_CATS = {
+  gasto:   ['Compra','Materiales','Equipamiento','Mano de obra','Pasajes','Comidas','Luz','Agua','Trámites','Otros'],
+  ingreso: ['Alquiler','Venta','Reembolso','Otros']
+};
+var TERRENO_DOC_CATS = ['Constancia de vivencia','Comprobante de compra','Recibo / boleta','Foto','Otro'];
+
+function r2(n){ return Math.round((n||0)*100)/100; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function getTerreno(){ return (patrimonioBolsas||[]).find(function(b){return b.tipo==='terreno';})||null; }
+function getEfectivo(){ return (patrimonioBolsas||[]).find(function(b){return b.id==='bol_1';})||null; }
+function efectoCaja(m){ if(!m||!m.afectaCaja) return 0; return m.tipo==='gasto' ? -m.monto : m.monto; }
+function terrenoTotales(t){
+  var movs=(t&&t.terreno&&t.terreno.movimientos)||[];
+  var compra=0, gastos=0, ingresos=0;
+  movs.forEach(function(m){
+    if(m.tipo==='gasto'){ gastos+=m.monto; if(m.categoria==='Compra') compra+=m.monto; }
+    else ingresos+=m.monto;
+  });
+  return {compra:r2(compra), gastos:r2(gastos), posteriores:r2(gastos-compra), ingresos:r2(ingresos), neto:r2(gastos-ingresos)};
+}
+function recalcTerreno(t){ t.monto = terrenoTotales(t).neto; t.fecha = todayISO(); }
+function terrenoMapsUrl(d){ return 'https://www.google.com/maps/search/?api=1&query='+d.lat+','+d.lng; }
+function constanciaInfo(t){
+  var c=t&&t.terreno&&t.terreno.constancia; if(!c||!c.fechaEmision) return null;
+  var vence=addMonths(c.fechaEmision, c.vigenciaMeses||3);
+  return {emision:c.fechaEmision, vence:vence, dias:daysBetween(todayISO(), vence), costo:c.costoRenovacion};
+}
+
+// ---- Carga inicial (datos que Gustavo pasó el 10/11/2026) ----
+function terrenoDatosIniciales(){
+  var M=function(fecha,categoria,monto,descripcion){ return {id:'tm_'+fecha.replace(/-/g,'')+'_'+Math.random().toString(36).slice(2,7), tipo:'gasto', fecha:fecha, categoria:categoria, monto:monto, descripcion:descripcion, afectaCaja:true}; };
+  return {
+    id:'bol_terreno', nombre:'Terreno Mz A3 Lt 27', tipo:'terreno', monto:0, fecha:todayISO(), notas:'Hijos de Profam',
+    terreno:{
+      datos:{
+        nombre:'Terreno Mz A3 Lt 27', referencia:'Hijos de Profam', fechaCompra:'2026-10-24',
+        vendedor:'Roman Caucha Miky E.', operacion:'Transferencia BCP op. 04427176',
+        coordTexto:'11°48\'55.4"S 77°09\'00.2"W', lat:-11.815389, lng:-77.150056, plusCode:'5RMX+RXW Santa Rosa', notas:''
+      },
+      constancia:{fechaEmision:'2026-10-20', vigenciaMeses:3, costoRenovacion:null, historial:[]},
+      movimientos:[
+        M('2026-10-24','Compra',20000,'Compra del terreno Mz A3 Lt 27 – Hijos de Profam (transferencia BCP)'),
+        M('2026-10-19','Equipamiento',650,'Tanque Rotoplas'),
+        M('2026-10-24','Pasajes',20,'Pasajes de trámites y visitas iniciales (fecha aproximada)'),
+        M('2026-11-01','Materiales',86,'Materiales – Ferretería Los Andes, nota 001010'),
+        M('2026-11-01','Pasajes',7,'Pasaje'),
+        M('2026-11-01','Comidas',38.5,'Almuerzo (pollo a la brasa)'),
+        M('2026-11-01','Comidas',19.5,'Gaseosas'),
+        M('2026-11-01','Pasajes',5,'Pasaje'),
+        M('2026-11-08','Materiales',208,'Materiales para conexión de agua – Ferretería Los Andes, nota 001108'),
+        M('2026-11-01','Comidas',13,'Gaseosas (¿fecha 08/11?)')
+      ],
+      documentos:[]
+    }
+  };
+}
+
+function btnSub(id,label,activo){
+  return '<button class="patri-tab" data-tab="'+id+'" style="padding:7px 18px;font-size:13px;font-weight:500;border-radius:var(--radius);border:'+(activo?'none':'1px solid var(--border)')+';background:'+(activo?'var(--accent)':'var(--bg-secondary)')+';color:'+(activo?'#fff':'var(--text-secondary)')+';cursor:pointer;">'+label+'</button>';
+}
+
+function renderTerreno(el){
+  var t=getTerreno();
+  var ef=getEfectivo();
+  if(!t){ renderTerrenoSetup(el, ef); return; }
+  var d=t.terreno.datos, tot=terrenoTotales(t), ci=constanciaInfo(t);
+  var mesActual=todayISO().slice(0,7);
+  var gastoMes=t.terreno.movimientos.filter(function(m){return m.tipo==='gasto'&&m.categoria!=='Compra'&&m.fecha.slice(0,7)===mesActual;}).reduce(function(a,m){return a+m.monto;},0);
+
+  var h='<div class="metric-grid">';
+  h+=metricCard('Inversión total en el terreno',fmtMoney(tot.neto));
+  h+=metricCard('Compra',fmtMoney(tot.compra));
+  h+=metricCard('Gastos después de la compra',fmtMoney(tot.posteriores));
+  h+=metricCard('Ingresos',fmtMoney(tot.ingresos));
+  h+=metricCard('Gastos de este mes',fmtMoney(gastoMes));
+  h+='</div>';
+
+  // Datos + ubicación
+  h+='<div class="card"><div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>🏡 Datos del terreno</span><button id="ter-edit-datos" style="font-size:12px;">✏️ Editar</button></div>';
+  var fila=function(k,v){ return v?'<div class="aj-row" style="border-bottom:1px solid var(--border);"><span class="muted">'+k+'</span><span style="text-align:right;">'+v+'</span></div>':''; };
+  h+=fila('Nombre',esc(d.nombre))+fila('Referencia',esc(d.referencia))+fila('Fecha de compra',fmtDate(d.fechaCompra))+fila('Vendedor',esc(d.vendedor))+fila('Pago',esc(d.operacion));
+  h+=fila('Coordenadas',esc(d.coordTexto)+(d.lat!=null?'<div class="muted">'+d.lat+', '+d.lng+'</div>':''))+fila('Plus Code',esc(d.plusCode))+fila('Notas',esc(d.notas));
+  if(d.lat!=null && d.lng!=null){
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">';
+    h+='<a href="'+terrenoMapsUrl(d)+'" target="_blank" rel="noopener"><button>📍 Abrir en Google Maps</button></a>';
+    h+='<button id="ter-wsp" style="background:#128C7E;color:#fff;border-color:#128C7E;">💬 Enviar por WhatsApp</button>';
+    if(navigator.share) h+='<button id="ter-share">📤 Compartir…</button>';
+    h+='</div>';
+  }
+  h+='</div>';
+
+  // Constancia de vivencia
+  h+='<div class="card"><div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>📄 Constancia de vivencia</span><span><button id="ter-renovar" style="font-size:12px;">🔄 Registrar renovación</button> <button id="ter-edit-const" style="font-size:12px;">✏️</button></span></div>';
+  if(ci){
+    var col=ci.dias<0?'var(--text-danger)':(ci.dias<=15?'#EF9F27':'var(--text-success)');
+    var txt=ci.dias<0?('Vencida hace '+Math.abs(ci.dias)+' días'):(ci.dias===0?'Vence hoy':'Vence en '+ci.dias+' días');
+    h+=fila('Emitida',fmtDate(ci.emision))+fila('Vence',fmtDate(ci.vence)+' <span style="color:'+col+';font-weight:600;">· '+txt+'</span>')+fila('Renovación','cada '+(t.terreno.constancia.vigenciaMeses||3)+' meses')+fila('Costo de renovación',ci.costo!=null?fmtMoney(ci.costo):'<span class="muted">por definir</span>');
+  } else h+='<div class="muted">Sin fecha de emisión registrada.</div>';
+  h+='</div>';
+
+  // Movimientos
+  var movs=t.terreno.movimientos.slice().sort(function(a,b){return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:0;});
+  h+='<div class="card"><div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>💸 Gastos e ingresos ('+movs.length+')</span><span style="display:flex;gap:8px;"><button id="ter-add-gasto" class="danger">− Gasto</button><button id="ter-add-ingreso" class="success-btn">+ Ingreso</button></span></div>';
+  h+='<div style="overflow-x:auto;"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right;">Monto</th><th title="Sale/entra de Efectivo disponible">Caja</th><th></th></tr></thead><tbody>';
+  movs.forEach(function(m){
+    var doc=m.docId?(t.terreno.documentos||[]).find(function(x){return x.id===m.docId;}):null;
+    h+='<tr><td style="white-space:nowrap;">'+fmtDate(m.fecha)+'</td><td>'+esc(m.descripcion)+(doc?' <button class="ter-ver-doc" data-id="'+doc.id+'" title="Ver comprobante" style="font-size:11px;padding:1px 6px;">📎</button>':'')+'</td><td>'+esc(m.categoria)+'</td>';
+    h+='<td style="text-align:right;white-space:nowrap;font-weight:600;color:'+(m.tipo==='gasto'?'var(--text-danger)':'var(--text-success)')+';">'+(m.tipo==='gasto'?'−':'+')+fmtMoney(m.monto)+'</td>';
+    h+='<td style="text-align:center;">'+(m.afectaCaja?'✓':'<span class="muted" title="No movió el efectivo">—</span>')+'</td>';
+    h+='<td style="white-space:nowrap;"><button class="ter-edit-mov" data-id="'+m.id+'" style="font-size:11px;padding:3px 8px;">Editar</button> <button class="ter-del-mov danger" data-id="'+m.id+'" style="font-size:11px;padding:3px 8px;">✕</button></td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td colspan="3" style="font-weight:600;">Total invertido (gastos − ingresos)</td><td style="text-align:right;font-weight:700;">'+fmtMoney(tot.neto)+'</td><td colspan="2"></td></tr></tfoot></table></div></div>';
+
+  // Resumen por categoría y por mes
+  var porCat={}, porMes={};
+  t.terreno.movimientos.forEach(function(m){
+    var s=m.tipo==='gasto'?m.monto:-m.monto;
+    var kc=(m.tipo==='ingreso'?'Ingreso: ':'')+m.categoria; porCat[kc]=r2((porCat[kc]||0)+s);
+    if(m.categoria!=='Compra'){ var km=m.fecha.slice(0,7); porMes[km]=r2((porMes[km]||0)+s); }
+  });
+  var mesesNom=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  h+='<div class="two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  h+='<div class="card"><div class="section-title">Por categoría</div><table><tbody>';
+  Object.keys(porCat).sort(function(a,b){return Math.abs(porCat[b])-Math.abs(porCat[a]);}).forEach(function(k){ h+='<tr><td>'+esc(k)+'</td><td style="text-align:right;">'+fmtMoney(porCat[k])+'</td></tr>'; });
+  h+='</tbody></table></div>';
+  h+='<div class="card"><div class="section-title">Por mes <span class="muted" style="font-size:12px;font-weight:400;">(sin la compra)</span></div><table><tbody>';
+  Object.keys(porMes).sort().reverse().forEach(function(k){ var p=k.split('-'); h+='<tr><td>'+mesesNom[+p[1]-1]+' '+p[0]+'</td><td style="text-align:right;">'+fmtMoney(porMes[k])+'</td></tr>'; });
+  h+='</tbody></table></div></div>';
+
+  // Documentos
+  var docs=(t.terreno.documentos||[]).slice().sort(function(a,b){return a.fecha<b.fecha?1:-1;});
+  h+='<div class="card"><div class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><span>📁 Documentos ('+docs.length+')</span><button id="ter-add-doc">⬆️ Subir PDF o foto</button></div>';
+  if(docs.length===0) h+='<div class="muted" style="font-size:13px;">Aún no hay documentos. Sube la constancia de vivencia, la transferencia, boletas o fotos.</div>';
+  else{
+    h+='<table><tbody>';
+    docs.forEach(function(x){
+      h+='<tr><td>'+(x.mime==='application/pdf'?'📄':'🖼️')+' '+esc(x.nombre)+'<div class="muted" style="font-size:11px;">'+esc(x.categoria)+' · '+fmtDate(x.fecha)+' · '+(x.tamano/1024/1024).toFixed(2)+' MB</div></td>';
+      h+='<td style="text-align:right;white-space:nowrap;"><button class="ter-ver-doc" data-id="'+x.id+'" style="font-size:12px;">Ver</button> <button class="ter-del-doc danger" data-id="'+x.id+'" style="font-size:11px;padding:3px 8px;">✕</button></td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+  h+='</div>';
+
+  el.innerHTML=h;
+
+  // --- eventos ---
+  document.getElementById('ter-edit-datos').onclick=function(){ openTerrenoDatosModal(t); };
+  var bw=document.getElementById('ter-wsp');
+  if(bw) bw.onclick=function(){
+    var txt='📍 '+d.nombre+(d.referencia?' – '+d.referencia:'')+'\n'+terrenoMapsUrl(d);
+    window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
+  };
+  var bs=document.getElementById('ter-share');
+  if(bs) bs.onclick=function(){ navigator.share({title:d.nombre, text:'📍 '+d.nombre+(d.referencia?' – '+d.referencia:''), url:terrenoMapsUrl(d)}).catch(function(){}); };
+  document.getElementById('ter-renovar').onclick=function(){ openRenovacionModal(t); };
+  document.getElementById('ter-edit-const').onclick=function(){ openConstanciaModal(t); };
+  document.getElementById('ter-add-gasto').onclick=function(){ openMovTerrenoModal(t,null,'gasto'); };
+  document.getElementById('ter-add-ingreso').onclick=function(){ openMovTerrenoModal(t,null,'ingreso'); };
+  el.querySelectorAll('.ter-edit-mov').forEach(function(b){ b.onclick=function(){ var m=t.terreno.movimientos.find(function(x){return x.id===b.getAttribute('data-id');}); openMovTerrenoModal(t,m,m.tipo); }; });
+  el.querySelectorAll('.ter-del-mov').forEach(function(b){ b.onclick=function(){
+    var m=t.terreno.movimientos.find(function(x){return x.id===b.getAttribute('data-id');}); if(!m) return;
+    var ef2=getEfectivo();
+    showConfirmModal('¿Eliminar <b>'+esc(m.descripcion)+'</b> ('+fmtMoney(m.monto)+')?'+(m.afectaCaja&&ef2?'<br><br>Efectivo disponible: '+fmtMoney(ef2.monto)+' → <b>'+fmtMoney(r2(ef2.monto-efectoCaja(m)))+'</b>':''), async function(){
+      snapshoot('Eliminar mov. terreno');
+      var e=getEfectivo(); if(e) e.monto=r2(e.monto-efectoCaja(m));
+      t.terreno.movimientos=t.terreno.movimientos.filter(function(x){return x.id!==m.id;});
+      recalcTerreno(t); await savePatrimonio(); renderPatrimonio();
+    });
+  }; });
+  document.getElementById('ter-add-doc').onclick=function(){ openDocModal(t,null); };
+  el.querySelectorAll('.ter-ver-doc').forEach(function(b){ b.onclick=function(){ verDocumentoTerreno(t,b.getAttribute('data-id')); }; });
+  el.querySelectorAll('.ter-del-doc').forEach(function(b){ b.onclick=function(){
+    var x=t.terreno.documentos.find(function(y){return y.id===b.getAttribute('data-id');}); if(!x) return;
+    showConfirmModal('¿Eliminar el documento <b>'+esc(x.nombre)+'</b>? Se borra el archivo guardado; no se puede deshacer.', async function(){
+      try{
+        var r=await sb.storage.from(TERRENO_BUCKET).remove([x.path]); if(r.error) throw r.error;
+      }catch(e){ alert('No se pudo borrar el archivo: '+(e.message||e)); return; }
+      t.terreno.documentos=t.terreno.documentos.filter(function(y){return y.id!==x.id;});
+      t.terreno.movimientos.forEach(function(m){ if(m.docId===x.id) delete m.docId; });
+      await savePatrimonio(); renderPatrimonio();
+    });
+  }; });
+}
+
+function renderTerrenoSetup(el, ef){
+  var t=terrenoDatosIniciales(), tot=terrenoTotales(t);
+  var antes=ef?ef.monto:0, despues=r2(antes-tot.neto);
+  var h='<div class="card"><div class="section-title">🏡 Registrar el terreno</div>';
+  h+='<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Se creará la bolsa <b>'+esc(t.nombre)+'</b> con estos movimientos. Todos salen del <b>Efectivo disponible</b>. Revísalos; después puedes editar o borrar cualquiera.</p>';
+  h+='<div style="overflow-x:auto;"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right;">Monto</th></tr></thead><tbody>';
+  t.terreno.movimientos.forEach(function(m){ h+='<tr><td>'+fmtDate(m.fecha)+'</td><td>'+esc(m.descripcion)+'</td><td>'+esc(m.categoria)+'</td><td style="text-align:right;">'+fmtMoney(m.monto)+'</td></tr>'; });
+  h+='</tbody><tfoot><tr><td colspan="3" style="font-weight:600;">Total</td><td style="text-align:right;font-weight:700;">'+fmtMoney(tot.neto)+'</td></tr></tfoot></table></div>';
+  h+='<div style="margin:16px 0;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;">';
+  if(!ef) h+='<span style="color:var(--text-danger);">No se encontró la bolsa "Efectivo disponible".</span>';
+  else h+='Efectivo disponible: <b>'+fmtMoney(antes)+'</b> → <b style="color:'+(despues<0?'var(--text-danger)':'')+'">'+fmtMoney(despues)+'</b>'+(despues<0?'<div style="color:var(--text-danger);font-size:12px;margin-top:6px;">⚠️ El efectivo quedaría negativo. Revisa el monto de Efectivo disponible antes de continuar.</div>':'');
+  h+='<div class="muted" style="font-size:12px;margin-top:6px;">El patrimonio total no cambia: el dinero pasa de Efectivo a Terreno.</div></div>';
+  h+='<button id="ter-crear" class="primary"'+(ef?'':' disabled')+'>Crear terreno y descontar '+fmtMoney(tot.neto)+'</button></div>';
+  el.innerHTML=h;
+  var b=document.getElementById('ter-crear');
+  if(b) b.onclick=async function(){
+    if(getTerreno()) { renderPatrimonio(); return; }
+    b.disabled=true;
+    snapshoot('Crear terreno');
+    var e=getEfectivo(); e.monto=r2(e.monto-tot.neto);
+    recalcTerreno(t); patrimonioBolsas.push(t);
+    await savePatrimonio(); renderPatrimonio();
+  };
+}
+
+function openMovTerrenoModal(t,m,tipo){
+  var isNew=!m;
+  m=m||{id:'tm_'+Date.now(), tipo:tipo, fecha:todayISO(), categoria:TERRENO_CATS[tipo][tipo==='gasto'?1:0], monto:'', descripcion:'', afectaCaja:true};
+  var cats=TERRENO_CATS[m.tipo].slice(); if(cats.indexOf(m.categoria)<0) cats.push(m.categoria);
+  var box=document.getElementById('modal-box');
+  box.innerHTML='<div class="modal-title">'+(isNew?(m.tipo==='gasto'?'Nuevo gasto':'Nuevo ingreso'):'Editar '+m.tipo)+' — terreno</div><div class="modal-body">'+
+    '<div class="form-group"><label>Fecha</label><input type="date" id="tm-f" value="'+m.fecha+'" /></div>'+
+    '<div class="form-group"><label>Categoría</label><select id="tm-c" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;background:var(--bg);color:var(--text);width:100%;">'+cats.map(function(c){return '<option'+(c===m.categoria?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></div>'+
+    '<div class="form-group"><label>Concepto</label><input type="text" id="tm-d" value="'+esc(m.descripcion)+'" placeholder="Ej. Recibo de luz octubre" /></div>'+
+    '<div class="form-group"><label>Monto (S/)</label><input type="number" step="0.01" min="0" id="tm-m" value="'+m.monto+'" inputmode="decimal" /></div>'+
+    '<label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="tm-caja" '+(m.afectaCaja?'checked':'')+' style="width:auto;" /> '+(m.tipo==='gasto'?'Sale del Efectivo disponible':'Entra al Efectivo disponible')+'</label>'+
+    (isNew||!m.docId?'<div class="form-group"><label>Comprobante (opcional, foto o PDF)</label><input type="file" id="tm-file" accept="application/pdf,image/*" /></div>':'<div class="muted" style="font-size:12px;">📎 Tiene comprobante adjunto</div>')+
+    '<div id="tm-prev" class="muted" style="font-size:12px;"></div><div id="tm-err" style="color:var(--text-danger);font-size:12px;"></div>'+
+    '</div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mc').onclick=closeModal;
+  var prev=function(){
+    var e=getEfectivo(); if(!e) return;
+    var nm={tipo:m.tipo, monto:parseFloat(document.getElementById('tm-m').value)||0, afectaCaja:document.getElementById('tm-caja').checked};
+    var delta=r2(efectoCaja(nm)-(isNew?0:efectoCaja(m)));
+    document.getElementById('tm-prev').textContent= delta===0?'Efectivo disponible sin cambio ('+fmtMoney(e.monto)+')':'Efectivo disponible: '+fmtMoney(e.monto)+' → '+fmtMoney(r2(e.monto+delta));
+  };
+  document.getElementById('tm-m').oninput=prev; document.getElementById('tm-caja').onchange=prev; prev();
+  document.getElementById('mok').onclick=async function(){
+    var err=document.getElementById('tm-err');
+    var f=document.getElementById('tm-f').value, c=document.getElementById('tm-c').value, d=document.getElementById('tm-d').value.trim();
+    var monto=r2(parseFloat(document.getElementById('tm-m').value));
+    if(!f){ err.textContent='Falta la fecha'; return; }
+    if(!d){ err.textContent='Falta el concepto'; return; }
+    if(!(monto>0)){ err.textContent='El monto debe ser mayor a 0'; return; }
+    var fileIn=document.getElementById('tm-file'), file=fileIn&&fileIn.files[0];
+    var btn=this; btn.disabled=true;
+    var doc=null;
+    if(file){
+      err.textContent=''; document.getElementById('tm-prev').textContent='Subiendo comprobante…';
+      try{ doc=await subirDocumentoTerreno(file, m.tipo==='gasto'?'Recibo / boleta':'Otro', d); }
+      catch(e){ err.textContent='No se pudo subir el archivo: '+(e.message||e)+'. No se guardó nada.'; btn.disabled=false; return; }
+    }
+    snapshoot(isNew?(m.tipo==='gasto'?'Gasto terreno':'Ingreso terreno'):'Editar mov. terreno');
+    var antes=isNew?0:efectoCaja(m);
+    var nuevo={id:m.id, tipo:m.tipo, fecha:f, categoria:c, descripcion:d, monto:monto, afectaCaja:document.getElementById('tm-caja').checked};
+    if(m.docId) nuevo.docId=m.docId;
+    if(doc){ t.terreno.documentos=t.terreno.documentos||[]; t.terreno.documentos.push(doc); nuevo.docId=doc.id; }
+    var e=getEfectivo(); if(e) e.monto=r2(e.monto+efectoCaja(nuevo)-antes);
+    if(isNew) t.terreno.movimientos.push(nuevo);
+    else { var i=t.terreno.movimientos.findIndex(function(x){return x.id===m.id;}); t.terreno.movimientos[i]=nuevo; }
+    recalcTerreno(t); closeModal(); await savePatrimonio(); renderPatrimonio();
+  };
+}
+
+function openTerrenoDatosModal(t){
+  var d=t.terreno.datos, box=document.getElementById('modal-box');
+  var inp=function(id,label,val,ph){ return '<div class="form-group"><label>'+label+'</label><input type="text" id="'+id+'" value="'+esc(val==null?'':val)+'" placeholder="'+(ph||'')+'" /></div>'; };
+  box.innerHTML='<div class="modal-title">Datos del terreno</div><div class="modal-body">'+
+    inp('td-n','Nombre',d.nombre)+inp('td-r','Referencia / dirección',d.referencia)+
+    '<div class="form-group"><label>Fecha de compra</label><input type="date" id="td-f" value="'+(d.fechaCompra||'')+'" /></div>'+
+    inp('td-v','Vendedor',d.vendedor)+inp('td-o','Pago',d.operacion)+
+    inp('td-c','Coordenadas (como las copia Google Maps)',d.coordTexto,'11°48\'55.4"S 77°09\'00.2"W  o  -11.8154, -77.1500')+
+    inp('td-p','Plus Code',d.plusCode)+inp('td-no','Notas',d.notas)+
+    '<div id="td-err" style="color:var(--text-danger);font-size:12px;"></div></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=async function(){
+    var ct=document.getElementById('td-c').value.trim(), ll=parseCoordenadas(ct);
+    if(ct && !ll){ document.getElementById('td-err').textContent='No entiendo esas coordenadas. Pega el formato de Google Maps.'; return; }
+    snapshoot('Datos terreno');
+    d.nombre=document.getElementById('td-n').value.trim()||d.nombre; d.referencia=document.getElementById('td-r').value.trim();
+    d.fechaCompra=document.getElementById('td-f').value; d.vendedor=document.getElementById('td-v').value.trim(); d.operacion=document.getElementById('td-o').value.trim();
+    d.coordTexto=ct; d.lat=ll?ll.lat:null; d.lng=ll?ll.lng:null; d.plusCode=document.getElementById('td-p').value.trim(); d.notas=document.getElementById('td-no').value.trim();
+    t.nombre=d.nombre; t.notas=d.referencia;
+    closeModal(); await savePatrimonio(); renderPatrimonio();
+  };
+}
+// Acepta "11°48'55.4"S 77°09'00.2"W" o "-11.8154, -77.1500"
+function parseCoordenadas(s){
+  if(!s) return null;
+  var dec=s.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if(dec) return {lat:+(+dec[1]).toFixed(6), lng:+(+dec[2]).toFixed(6)};
+  var re=/(\d+)\s*°\s*(\d+)\s*['′]\s*([\d.]+)\s*(?:"|″|'')?\s*([NSEWOnsewo])/g, parts=[], x;
+  while((x=re.exec(s))) parts.push(x);
+  if(parts.length!==2) return null;
+  var conv=function(p){ var v=+p[1]+(+p[2])/60+(+p[3])/3600; return /[SWOswo]/.test(p[4])?-v:v; };
+  return {lat:+conv(parts[0]).toFixed(6), lng:+conv(parts[1]).toFixed(6)};
+}
+
+function openConstanciaModal(t){
+  var c=t.terreno.constancia=t.terreno.constancia||{fechaEmision:'',vigenciaMeses:3,costoRenovacion:null,historial:[]};
+  var box=document.getElementById('modal-box');
+  box.innerHTML='<div class="modal-title">Constancia de vivencia</div><div class="modal-body">'+
+    '<div class="form-group"><label>Fecha de emisión</label><input type="date" id="tc-f" value="'+(c.fechaEmision||'')+'" /></div>'+
+    '<div class="form-group"><label>Vigencia (meses)</label><input type="number" min="1" id="tc-v" value="'+(c.vigenciaMeses||3)+'" /></div>'+
+    '<div class="form-group"><label>Costo de renovación (S/)</label><input type="number" step="0.01" min="0" id="tc-c" value="'+(c.costoRenovacion==null?'':c.costoRenovacion)+'" placeholder="por definir" /></div>'+
+    '</div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=async function(){
+    snapshoot('Constancia terreno');
+    c.fechaEmision=document.getElementById('tc-f').value; c.vigenciaMeses=parseInt(document.getElementById('tc-v').value)||3;
+    var cc=document.getElementById('tc-c').value; c.costoRenovacion=cc===''?null:r2(parseFloat(cc));
+    closeModal(); await savePatrimonio(); renderPatrimonio();
+  };
+}
+
+function openRenovacionModal(t){
+  var c=t.terreno.constancia||{vigenciaMeses:3};
+  var box=document.getElementById('modal-box');
+  box.innerHTML='<div class="modal-title">Renovación de la constancia</div><div class="modal-body">'+
+    '<div class="form-group"><label>Fecha de la nueva constancia</label><input type="date" id="tr-f" value="'+todayISO()+'" /></div>'+
+    '<div class="form-group"><label>Costo pagado (S/)</label><input type="number" step="0.01" min="0" id="tr-c" value="'+(c.costoRenovacion==null?'':c.costoRenovacion)+'" /></div>'+
+    '<label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="tr-g" checked style="width:auto;" /> Registrar el costo como gasto (Trámites) y descontarlo del Efectivo</label>'+
+    '<div id="tr-err" style="color:var(--text-danger);font-size:12px;"></div></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Guardar</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('mok').onclick=async function(){
+    var f=document.getElementById('tr-f').value, costo=r2(parseFloat(document.getElementById('tr-c').value)), gasto=document.getElementById('tr-g').checked;
+    if(!f){ document.getElementById('tr-err').textContent='Falta la fecha'; return; }
+    if(gasto && !(costo>0)){ document.getElementById('tr-err').textContent='Pon el costo o desmarca "Registrar el costo como gasto"'; return; }
+    snapshoot('Renovar constancia');
+    t.terreno.constancia=t.terreno.constancia||{vigenciaMeses:3,historial:[]};
+    var cc=t.terreno.constancia; cc.historial=cc.historial||[];
+    if(cc.fechaEmision) cc.historial.push({fechaEmision:cc.fechaEmision});
+    cc.fechaEmision=f; if(costo>0) cc.costoRenovacion=costo;
+    if(gasto){
+      var m={id:'tm_'+Date.now(), tipo:'gasto', fecha:f, categoria:'Trámites', descripcion:'Renovación constancia de vivencia', monto:costo, afectaCaja:true};
+      t.terreno.movimientos.push(m); var e=getEfectivo(); if(e) e.monto=r2(e.monto-costo);
+      recalcTerreno(t);
+    }
+    closeModal(); await savePatrimonio(); renderPatrimonio();
+  };
+}
+
+// ---- Documentos (Supabase Storage, carpeta privada) ----
+async function subirDocumentoTerreno(file, categoria, nombre){
+  if(!sb) throw new Error('sin conexión');
+  if(file.size > TERRENO_MAX_MB*1024*1024) throw new Error('el archivo pesa más de '+TERRENO_MAX_MB+' MB');
+  var ext=(file.name.split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'bin';
+  var path='terreno/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
+  var r=await sb.storage.from(TERRENO_BUCKET).upload(path, file, {contentType:file.type||'application/octet-stream', upsert:false});
+  if(r.error) throw r.error;
+  return {id:'td_'+Date.now(), nombre:nombre||file.name, archivo:file.name, path:path, mime:file.type, tamano:file.size, categoria:categoria, fecha:todayISO()};
+}
+function openDocModal(t){
+  var box=document.getElementById('modal-box');
+  box.innerHTML='<div class="modal-title">Subir documento</div><div class="modal-body">'+
+    '<div class="form-group"><label>Archivo (PDF o foto, máx. '+TERRENO_MAX_MB+' MB)</label><input type="file" id="dc-file" accept="application/pdf,image/*" /></div>'+
+    '<div class="form-group"><label>Tipo</label><select id="dc-c" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;background:var(--bg);color:var(--text);width:100%;">'+TERRENO_DOC_CATS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div>'+
+    '<div class="form-group"><label>Nombre</label><input type="text" id="dc-n" placeholder="Ej. Constancia de vivencia oct-2026" /></div>'+
+    '<div id="dc-err" style="color:var(--text-danger);font-size:12px;"></div></div><div class="modal-actions"><button id="mc">Cancelar</button><button id="mok" class="primary" style="padding:8px 20px;">Subir</button></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('mc').onclick=closeModal;
+  document.getElementById('dc-file').onchange=function(){ var f=this.files[0], n=document.getElementById('dc-n'); if(f&&!n.value) n.value=f.name.replace(/\.[^.]+$/,''); };
+  document.getElementById('mok').onclick=async function(){
+    var f=document.getElementById('dc-file').files[0], err=document.getElementById('dc-err');
+    if(!f){ err.textContent='Elige un archivo'; return; }
+    var btn=this; btn.disabled=true; btn.textContent='Subiendo…';
+    try{
+      var doc=await subirDocumentoTerreno(f, document.getElementById('dc-c').value, document.getElementById('dc-n').value.trim());
+      t.terreno.documentos=t.terreno.documentos||[]; t.terreno.documentos.push(doc);
+      closeModal(); await savePatrimonio(); renderPatrimonio();
+    }catch(e){ err.textContent='No se pudo subir: '+(e.message||e); btn.disabled=false; btn.textContent='Subir'; }
+  };
+}
+async function verDocumentoTerreno(t,id){
+  var x=(t.terreno.documentos||[]).find(function(y){return y.id===id;}); if(!x) return;
+  var w=window.open('about:blank','_blank');   // se abre ya, para que el navegador no lo bloquee
+  try{
+    var r=await sb.storage.from(TERRENO_BUCKET).createSignedUrl(x.path, 300);
+    if(r.error) throw r.error;
+    if(w) w.location.href=r.data.signedUrl; else location.href=r.data.signedUrl;
+  }catch(e){ if(w) w.close(); alert('No se pudo abrir el documento: '+(e.message||e)); }
+}
 
 // ============================================================
 // CAJA INTERNA
@@ -2281,6 +2683,10 @@ async function init(){
       if(dias<0) alertas.push({tipo:'mora',msg:'<b>'+l.nombre+' (cuotas)</b> — vencida hace '+Math.abs(dias)+'d ('+fmtDate(prox.fechaVencimiento)+')'});
       else if(dias<=3) alertas.push({tipo:'prox',msg:'<b>'+l.nombre+' (cuotas)</b> — vence en '+dias+'d ('+fmtDate(prox.fechaVencimiento)+')'});
     });
+    try{
+      var _ter=getTerreno(), _ci=_ter&&constanciaInfo(_ter);
+      if(_ci && _ci.dias<=15) alertas.push({tipo:'terreno',msg:'<b>Constancia de vivencia</b> — '+(_ci.dias<0?'vencida hace '+Math.abs(_ci.dias)+'d':(_ci.dias===0?'vence hoy':'vence en '+_ci.dias+'d'))+' ('+fmtDate(_ci.vence)+')'});
+    }catch(e){ console.error('alerta terreno',e); }
     if(alertas.length===0) return;
     var mora=alertas.filter(function(a){return a.tipo==='mora';});
     var prox=alertas.filter(function(a){return a.tipo==='prox';});
@@ -2293,6 +2699,11 @@ async function init(){
     if(prox.length>0){
       html+='<div style="font-size:12px;color:#EF9F27;font-weight:600;margin:'+(mora.length>0?'8px':0)+' 0 4px;">Próximos 3 días ('+prox.length+')</div>';
       prox.forEach(function(a){html+='<div style="font-size:12px;margin-bottom:3px;">'+a.msg+'</div>';});
+    }
+    var ter=alertas.filter(function(a){return a.tipo==='terreno';});
+    if(ter.length>0){
+      html+='<div style="font-size:12px;color:#a3e635;font-weight:600;margin:'+(mora.length+prox.length>0?'8px':0)+' 0 4px;">🏡 Terreno</div>';
+      ter.forEach(function(a){html+='<div style="font-size:12px;margin-bottom:3px;">'+a.msg+'</div>';});
     }
     html+='</div>';
     document.body.insertAdjacentHTML('beforeend',html);
